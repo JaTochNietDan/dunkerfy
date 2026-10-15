@@ -53,3 +53,9 @@ Pending: Apple Developer portal sign-in and Developer ID Application certificate
 - Packaged native smoke test constructs all five pages, decodes all 30 presets through NSSound and verifies their duration, filters down to Wilhelm, and creates the expected rule draft. It does not play every sound or claim a listening review.
 - Actual AppKit views were rendered with synthetic rules into ignored `dist/ui-preview/` and visually checked in light and dark appearances. These are offscreen UI renders, not screen captures or real notification evidence; they are not published on the website.
 - Production signing, actual update installation/relaunch, live notification capture, and interactive keyboard/VoiceOver checks remain pending. The release remains unpublished while Apple account setup is pending.
+
+### Compact spacing follow-up
+
+- Reduced sidebar row pitch from 43 to 30 points, button height from 34 to 27 points, and sidebar width from 180 to 164 points.
+- Reduced window size to 964 × 620 and tightened branding, page headings, and listener controls.
+- Release build and native five-page smoke test passed. Rendered all five pages in both appearances and visually checked Rules in light mode and Sounds in dark mode for clipping and spacing.

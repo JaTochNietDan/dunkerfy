@@ -135,7 +135,7 @@ See [update and signing setup](docs/UPDATES.md) for the mise-managed release wor
 
 ## Compact UI and sound bank (0.2.0 development)
 
-The native interface now uses a smaller 980 × 660 window, an icon sidebar, rounded panels, teal actions, and light/dark styling. The soundboard has search, category filters, previews with a Stop control, and a Use action to create a rule with your chosen sound.
+The native interface now uses a smaller 964 × 620 window, an icon sidebar, rounded panels, teal actions, and light/dark styling. The soundboard has search, category filters, previews with a Stop control, and a Use action to create a rule with your chosen sound.
 
 Thirty sounds ship with the app: the CC0 **Wilhelm scream** plus 29 original effects. Fun presets include sad trombone, air horn, ba dum tss, record scratch, rubber boing, slide whistle, rubber duck, whoopee, tiny violin, crickets, and a dramatic sting. Arcade cues include coin, level up, power up, game over, pew pew, checkpoint, combo breaker, and pixel hop. Seven calmer tones round out the bank. Existing macOS and imported sounds remain available.
 

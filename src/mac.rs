@@ -373,24 +373,24 @@ pub fn run() {
             }
         };
         let alloc: Allocated<AnyObject> = msg_send![class!(NSWindow), alloc];
-        let window: Obj = msg_send![alloc, initWithContentRect: rect(0.,0.,980.,660.), styleMask: 7usize, backing: 2usize, defer: Bool::NO];
+        let window: Obj = msg_send![alloc, initWithContentRect: rect(0.,0.,964.,620.), styleMask: 7usize, backing: 2usize, defer: Bool::NO];
         let _: () = msg_send![&window, setTitle: &*string("Dunkerfy")];
         let _: () = msg_send![&window, setReleasedWhenClosed: Bool::NO];
         let _: () = msg_send![&window, setTitlebarAppearsTransparent: Bool::YES];
         let _: () = msg_send![&window, center];
         let root: *mut AnyObject = msg_send![&window, contentView];
         let root = &*root;
-        let sidebar = frame(class!(NSVisualEffectView), rect(0., 0., 180., 660.));
+        let sidebar = frame(class!(NSVisualEffectView), rect(0., 0., 164., 620.));
         let _: () = msg_send![&sidebar, setMaterial: 7isize];
         let _: () = msg_send![&sidebar, setBlendingMode: 0isize];
         add(root, &sidebar);
-        let brand = label(&sidebar, "◉", rect(20., 588., 36., 38.), 29., true);
+        let brand = label(&sidebar, "◉", rect(16., 563., 28., 30.), 24., true);
         let _: () = msg_send![&brand, setTextColor: accent()];
-        label(&sidebar, "Dunkerfy", rect(57., 597., 110., 27.), 18., true);
+        label(&sidebar, "Dunkerfy", rect(47., 569., 106., 24.), 16., true);
         secondary(&label(
             &sidebar,
             "YOUR APPS. YOUR SOUND.",
-            rect(22., 565., 150., 20.),
+            rect(18., 544., 140., 16.),
             9.,
             true,
         ));
@@ -410,14 +410,14 @@ pub fn run() {
                 &target,
                 title,
                 10 + i as isize,
-                rect(14., 505. - i as f64 * 43., 152., 34.),
+                rect(10., 502. - i as f64 * 30., 144., 27.),
             );
             symbol(&nav, icon);
             let _: () = msg_send![&nav, setAlignment: 0usize];
             navigation.push(nav);
         }
-        label(&sidebar, "LISTENER", rect(22., 153., 140., 20.), 9., true);
-        let status_label = label(&sidebar, "Starting…", rect(22., 87., 138., 60.), 11., false);
+        label(&sidebar, "LISTENER", rect(18., 130., 128., 16.), 9., true);
+        let status_label = label(&sidebar, "Starting…", rect(18., 70., 128., 54.), 11., false);
         secondary(&status_label);
         let pause_button = button(
             &sidebar,
@@ -428,9 +428,9 @@ pub fn run() {
                 "Pause listening"
             },
             20,
-            rect(14., 35., 152., 32.),
+            rect(10., 24., 144., 28.),
         );
-        let content = frame(class!(NSView), rect(180., 0., 800., 660.));
+        let content = frame(class!(NSView), rect(164., 0., 800., 620.));
         add(root, &content);
         let updater = crate::updater::Updater::new(
             !std::env::args().any(|a| a == "--smoke-test" || a == "--render-ui"),
@@ -651,18 +651,18 @@ impl App {
             let v: *mut AnyObject = msg_send![&copy, objectAtIndex: i];
             let _: () = msg_send![v, removeFromSuperview];
         }
-        let background = panel(&self.content, rect(0., 0., 800., 660.));
+        let background = panel(&self.content, rect(0., 0., 800., 620.));
         let fill: *mut AnyObject = msg_send![class!(NSColor), windowBackgroundColor];
         let _: () = msg_send![&background,setFillColor:fill];
         let _: () = msg_send![&background,setBorderWidth:0f64];
         let _: () = msg_send![&background,setCornerRadius:0f64];
     }
     unsafe fn header(&self, title: &str, subtitle: &str) {
-        label(&self.content, title, rect(24., 597., 752., 34.), 24., true);
+        label(&self.content, title, rect(24., 579., 752., 28.), 21., true);
         secondary(&label(
             &self.content,
             subtitle,
-            rect(24., 558., 752., 32.),
+            rect(24., 549., 752., 26.),
             12.,
             false,
         ));
