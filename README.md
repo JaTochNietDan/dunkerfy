@@ -132,3 +132,11 @@ Dunkerfy is an independent project inspired by the idea of per-app notification 
 Sparkle is integrated directly from Rust, with an Updates page, Check for Updates menu item, opt-in automatic checks and installation, and signed feeds/downloads. Apple distribution-signing setup and a full installation/relaunch test are pending; the published download above remains 0.1.0. Existing users will install the first updater-enabled release manually once.
 
 See [update and signing setup](docs/UPDATES.md) for the mise-managed release workflow.
+
+## Compact UI and sound bank (0.2.0 development)
+
+The native interface now uses a smaller 980 × 660 window, an icon sidebar, rounded panels, teal actions, and light/dark styling. The soundboard has search, category filters, previews with a Stop control, and a Use action to create a rule with your chosen sound.
+
+Thirty sounds ship with the app: the CC0 **Wilhelm scream** plus 29 original effects. Fun presets include sad trombone, air horn, ba dum tss, record scratch, rubber boing, slide whistle, rubber duck, whoopee, tiny violin, crickets, and a dramatic sting. Arcade cues include coin, level up, power up, game over, pew pew, checkpoint, combo breaker, and pixel hop. Seven calmer tones round out the bank. Existing macOS and imported sounds remain available.
+
+See [audio attribution](Resources/Sounds/ATTRIBUTION.md). The original effects can be regenerated with `mise run sounds-generate`. `mise run ui-preview` renders the actual AppKit views using sample rules for local layout review; it does not capture your screen or notification contents. These features are in source and the local development build; the published v0.1.0 download does not include them yet.

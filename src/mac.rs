@@ -61,6 +61,45 @@ unsafe fn secondary(field: &AnyObject) {
     let color: *mut AnyObject = msg_send![class!(NSColor), secondaryLabelColor];
     let _: () = msg_send![field, setTextColor: color];
 }
+unsafe fn accent() -> *mut AnyObject {
+    msg_send![class!(NSColor), colorWithSRGBRed: 0.08f64, green: 0.52f64, blue: 0.46f64, alpha: 1.0f64]
+}
+unsafe fn panel(parent: &AnyObject, r: NSRect) -> Obj {
+    let box_view = frame(class!(NSBox), r);
+    let _: () = msg_send![&box_view, setBoxType: 4usize];
+    let _: () = msg_send![&box_view, setTitlePosition: 0usize];
+    let _: () = msg_send![&box_view, setCornerRadius: 12f64];
+    let _: () = msg_send![&box_view, setBorderWidth: 0.6f64];
+    let fill: *mut AnyObject = msg_send![class!(NSColor), controlBackgroundColor];
+    let edge: *mut AnyObject = msg_send![class!(NSColor), separatorColor];
+    let _: () = msg_send![&box_view, setFillColor: fill];
+    let _: () = msg_send![&box_view, setBorderColor: edge];
+    add(parent, &box_view);
+    box_view
+}
+unsafe fn symbol(button: &AnyObject, name: &str) {
+    let image: *mut AnyObject = msg_send![class!(NSImage), imageWithSystemSymbolName: &*string(name), accessibilityDescription: ptr::null::<NSString>()];
+    if !image.is_null() {
+        let _: () = msg_send![button, setImage: image];
+        let _: () = msg_send![button, setImagePosition: 2usize];
+    }
+}
+unsafe fn primary(button: &AnyObject) {
+    let _: () = msg_send![button, setBordered: Bool::NO];
+    let _: () = msg_send![button, setWantsLayer: Bool::YES];
+    let layer: *mut AnyObject = msg_send![button, layer];
+    let color: *const std::ffi::c_void = msg_send![accent(), CGColor];
+    let _: () = msg_send![layer, setBackgroundColor: color];
+    let _: () = msg_send![layer, setCornerRadius: 7f64];
+    let white: *mut AnyObject = msg_send![class!(NSColor), whiteColor];
+    let _: () = msg_send![button, setContentTintColor: white];
+    let title: *mut NSString = msg_send![button, title];
+    let attributes: Obj =
+        msg_send![class!(NSDictionary), dictionaryWithObject: white, forKey: &*string("NSColor")];
+    let allocated: Allocated<AnyObject> = msg_send![class!(NSAttributedString), alloc];
+    let attributed: Obj = msg_send![allocated, initWithString: title, attributes: &*attributes];
+    let _: () = msg_send![button, setAttributedTitle: &*attributed];
+}
 unsafe fn button(
     parent: &AnyObject,
     target: &AnyObject,
@@ -71,6 +110,12 @@ unsafe fn button(
     let b: Obj = msg_send![class!(NSButton), buttonWithTitle: &*string(title), target: target, action: sel!(action:)];
     let _: () = msg_send![&b, setFrame: r];
     let _: () = msg_send![&b, setTag: tag];
+    let _: () = msg_send![&b, setBezelStyle: 1usize];
+    let font: *mut AnyObject = msg_send![class!(NSFont), systemFontOfSize: 12f64, weight: 0.23f64];
+    let _: () = msg_send![&b, setFont: font];
+    if tag == 30 || tag == 31 {
+        primary(&b);
+    }
     add(parent, &b);
     b
 }
@@ -84,6 +129,7 @@ unsafe fn check(
 ) -> Obj {
     let b = button(parent, target, title, tag, r);
     let _: () = msg_send![&b, setButtonType: 3usize];
+    let _: () = msg_send![&b, setBordered: Bool::NO];
     let _: () = msg_send![&b, setState: if checked {1isize} else {0isize}];
     b
 }
@@ -122,6 +168,24 @@ unsafe fn open_url(url: &str) {
     let _: Bool = msg_send![workspace, openURL: url];
 }
 
+fn sound_category(sound: &Sound) -> &str {
+    match sound {
+        Sound::Bundled(id) => dunkerfy::catalog::preset(id)
+            .map(|p| p.category.as_str())
+            .unwrap_or("Bundled"),
+        Sound::System(_) => "macOS",
+        Sound::Imported(_) => "Imported",
+    }
+}
+fn sound_detail(sound: &Sound) -> String {
+    match sound {
+        Sound::Bundled(id) => dunkerfy::catalog::preset(id)
+            .map(|p| p.description.clone())
+            .unwrap_or_default(),
+        Sound::System(_) => "A familiar macOS classic.".into(),
+        Sound::Imported(_) => "Your audio, copied into the library.".into(),
+    }
+}
 struct Editor {
     name: Obj,
     app: Obj,
@@ -143,6 +207,12 @@ struct Activity {
 }
 struct App {
     updater: Result<crate::updater::Updater, String>,
+    navigation: Vec<Obj>,
+    sound_filter: usize,
+    sound_query: String,
+    sound_grid: Option<Obj>,
+    sound_count: Option<Obj>,
+    now_playing: Option<Obj>,
     application: Obj,
     target: Obj,
     window: Obj,
@@ -227,7 +297,10 @@ extern "C" fn should_terminate(_: *mut AnyObject, _: Sel, _: *mut AnyObject) -> 
 pub fn run() {
     autoreleasepool(|_| unsafe {
         if !std::env::args().any(|arg| {
-            arg == "--smoke-test" || arg == "--updater-smoke-test" || arg == "--write-icon"
+            arg == "--smoke-test"
+                || arg == "--updater-smoke-test"
+                || arg == "--write-icon"
+                || arg == "--render-ui"
         }) {
             let bundle: *mut AnyObject = msg_send![class!(NSBundle), mainBundle];
             let identifier: *mut NSString = msg_send![bundle, bundleIdentifier];
@@ -287,7 +360,12 @@ pub fn run() {
                 return;
             }
         };
-        let settings = match storage.load() {
+        let settings = match if std::env::args().any(|a| a == "--smoke-test" || a == "--render-ui")
+        {
+            Ok(Settings::default())
+        } else {
+            storage.load()
+        } {
             Ok(s) => s,
             Err(e) => {
                 alert("Settings need attention", &e);
@@ -295,77 +373,68 @@ pub fn run() {
             }
         };
         let alloc: Allocated<AnyObject> = msg_send![class!(NSWindow), alloc];
-        let window: Obj = msg_send![alloc, initWithContentRect: rect(0.,0.,1040.,720.), styleMask: 7usize, backing: 2usize, defer: Bool::NO];
+        let window: Obj = msg_send![alloc, initWithContentRect: rect(0.,0.,980.,660.), styleMask: 7usize, backing: 2usize, defer: Bool::NO];
         let _: () = msg_send![&window, setTitle: &*string("Dunkerfy")];
         let _: () = msg_send![&window, setReleasedWhenClosed: Bool::NO];
+        let _: () = msg_send![&window, setTitlebarAppearsTransparent: Bool::YES];
         let _: () = msg_send![&window, center];
         let root: *mut AnyObject = msg_send![&window, contentView];
         let root = &*root;
-        let sidebar = frame(class!(NSVisualEffectView), rect(0., 0., 210., 720.));
+        let sidebar = frame(class!(NSVisualEffectView), rect(0., 0., 180., 660.));
         let _: () = msg_send![&sidebar, setMaterial: 7isize];
         let _: () = msg_send![&sidebar, setBlendingMode: 0isize];
         add(root, &sidebar);
-        label(
-            &sidebar,
-            "◉  Dunkerfy",
-            rect(22., 650., 178., 36.),
-            25.,
-            true,
-        );
+        let brand = label(&sidebar, "◉", rect(20., 588., 36., 38.), 29., true);
+        let _: () = msg_send![&brand, setTextColor: accent()];
+        label(&sidebar, "Dunkerfy", rect(57., 597., 110., 27.), 18., true);
         secondary(&label(
             &sidebar,
-            "A sound for every app.",
-            rect(24., 619., 175., 25.),
-            12.,
-            false,
+            "YOUR APPS. YOUR SOUND.",
+            rect(22., 565., 150., 20.),
+            9.,
+            true,
         ));
-        for (i, title) in [
-            "Sound rules",
-            "Sound library",
-            "Activity",
-            "Settings",
-            "Updates",
+        let mut navigation = Vec::new();
+        for (i, (title, icon)) in [
+            ("  Rules", "slider.horizontal.3"),
+            ("  Sounds", "waveform"),
+            ("  Activity", "bolt.horizontal"),
+            ("  Settings", "gearshape"),
+            ("  Updates", "arrow.down.circle"),
         ]
         .iter()
         .enumerate()
         {
-            button(
+            let nav = button(
                 &sidebar,
                 &target,
                 title,
                 10 + i as isize,
-                rect(18., 550. - i as f64 * 46., 174., 34.),
+                rect(14., 505. - i as f64 * 43., 152., 34.),
             );
+            symbol(&nav, icon);
+            let _: () = msg_send![&nav, setAlignment: 0usize];
+            navigation.push(nav);
         }
-        label(
-            &sidebar,
-            "ON THIS MAC",
-            rect(24., 172., 170., 20.),
-            10.,
-            true,
-        );
-        let status_label = label(
-            &sidebar,
-            "Starting…",
-            rect(24., 107., 166., 58.),
-            12.,
-            false,
-        );
+        label(&sidebar, "LISTENER", rect(22., 153., 140., 20.), 9., true);
+        let status_label = label(&sidebar, "Starting…", rect(22., 87., 138., 60.), 11., false);
         secondary(&status_label);
         let pause_button = button(
             &sidebar,
             &target,
             if settings.paused {
-                "Resume listening"
+                "Resume"
             } else {
                 "Pause listening"
             },
             20,
-            rect(18., 49., 174., 32.),
+            rect(14., 35., 152., 32.),
         );
-        let content = frame(class!(NSView), rect(210., 0., 830., 720.));
+        let content = frame(class!(NSView), rect(180., 0., 800., 660.));
         add(root, &content);
-        let updater = crate::updater::Updater::new(!std::env::args().any(|a| a == "--smoke-test"));
+        let updater = crate::updater::Updater::new(
+            !std::env::args().any(|a| a == "--smoke-test" || a == "--render-ui"),
+        );
         let menu = new(class!(NSMenu));
         menu_item(&menu, &target, "Open Dunkerfy", 1, "");
         let menu_pause = menu_item(
@@ -415,6 +484,12 @@ pub fn run() {
         let selected = settings.rules.first().map(|r| r.id);
         let mut app = App {
             updater,
+            navigation,
+            sound_filter: 0,
+            sound_query: String::new(),
+            sound_grid: None,
+            sound_count: None,
+            now_playing: None,
             application: application.clone(),
             target,
             window,
@@ -427,7 +502,11 @@ pub fn run() {
             settings,
             storage,
             engine: Engine::default(),
-            receiver: monitor::start(),
+            receiver: if std::env::args().any(|a| a == "--smoke-test" || a == "--render-ui") {
+                std::sync::mpsc::channel().1
+            } else {
+                monitor::start()
+            },
             page: 0,
             selected,
             editor: None,
@@ -439,16 +518,83 @@ pub fn run() {
             activity_view: None,
         };
         app.render();
+        if let Some(path) = std::env::args().skip_while(|a| a != "--render-ui").nth(1) {
+            std::fs::create_dir_all(&path).unwrap();
+            app.settings.rules = vec![
+                Rule {
+                    name: "Team chat".into(),
+                    app_name: "Slack".into(),
+                    sound: Sound::Bundled("wilhelm".into()),
+                    ..Rule::default()
+                },
+                Rule {
+                    name: "Inbox".into(),
+                    app_name: "Mail".into(),
+                    sound: Sound::Bundled("bubble".into()),
+                    ..Rule::default()
+                },
+                Rule {
+                    name: "Heads up".into(),
+                    app_name: "Messages".into(),
+                    sound: Sound::Bundled("level-up".into()),
+                    ..Rule::default()
+                },
+            ];
+            app.selected = Some(app.settings.rules[0].id);
+            set_text(&app.status_label, "Preview mode\nSample rules");
+            for (mode, appearance_name) in [
+                ("light", "NSAppearanceNameAqua"),
+                ("dark", "NSAppearanceNameDarkAqua"),
+            ] {
+                let appearance: *mut AnyObject =
+                    msg_send![class!(NSAppearance),appearanceNamed:&*string(appearance_name)];
+                let _: () = msg_send![&app.window,setAppearance:appearance];
+                let _: () = msg_send![class!(NSAppearance),setCurrentAppearance:appearance];
+                for page in 0..5 {
+                    app.page = page;
+                    app.render();
+                    let _: () = msg_send![&app.window, displayIfNeeded];
+                    render_view(root, &format!("{path}/{mode}-{page}.png"));
+                }
+            }
+            let _: () = msg_send![&app._timer, invalidate];
+            println!("Rendered native UI previews with sample data to {path}");
+            return;
+        }
         if std::env::args().any(|arg| arg == "--smoke-test") {
             for page in 0..5 {
                 app.page = page;
                 app.render();
             }
+            for preset in dunkerfy::catalog::PRESETS.iter() {
+                let path = app
+                    .storage
+                    .sound_path(&Sound::Bundled(preset.id.clone()))
+                    .unwrap();
+                let audio =
+                    load_audio(&path).expect("Every bundled sound must decode with NSSound");
+                let duration: f64 = msg_send![&audio, duration];
+                assert!(
+                    (duration - preset.duration).abs() < 0.025,
+                    "Incorrect duration for {}",
+                    preset.id
+                );
+            }
+            app.page = 1;
+            app.sound_query = "wilhelm".into();
+            app.render();
+            assert!(get_text(app.sound_count.as_ref().unwrap()).starts_with("1 SOUNDS"));
+            let sender = app.target.clone();
+            app.action(4000, &sender);
+            assert!(app
+                .editor
+                .as_ref()
+                .is_some_and(|e| e.original.sound == Sound::Bundled("wilhelm".into())));
             app.page = 0;
             app.clear_page();
             app.draw_editor(Rule::default());
             println!(
-                "Native AppKit smoke test passed: five pages, editor, menu, login service, and updater construction."
+                "Native AppKit smoke test passed: five pages, editor, menu, login service, updater, 30 decoded sounds, search, and use-sound draft."
             );
             let _: () = msg_send![&app._timer, invalidate];
             return;
@@ -493,6 +639,9 @@ impl App {
         }
     }
     unsafe fn clear_page(&mut self) {
+        self.sound_grid = None;
+        self.sound_count = None;
+        self.now_playing = None;
         self.editor = None;
         self.activity_view = None;
         let subviews: Obj = msg_send![&self.content, subviews];
@@ -502,19 +651,33 @@ impl App {
             let v: *mut AnyObject = msg_send![&copy, objectAtIndex: i];
             let _: () = msg_send![v, removeFromSuperview];
         }
+        let background = panel(&self.content, rect(0., 0., 800., 660.));
+        let fill: *mut AnyObject = msg_send![class!(NSColor), windowBackgroundColor];
+        let _: () = msg_send![&background,setFillColor:fill];
+        let _: () = msg_send![&background,setBorderWidth:0f64];
+        let _: () = msg_send![&background,setCornerRadius:0f64];
     }
     unsafe fn header(&self, title: &str, subtitle: &str) {
-        label(&self.content, title, rect(32., 641., 760., 40.), 29., true);
+        label(&self.content, title, rect(24., 597., 752., 34.), 24., true);
         secondary(&label(
             &self.content,
             subtitle,
-            rect(32., 595., 760., 38.),
-            13.,
+            rect(24., 558., 752., 32.),
+            12.,
             false,
         ));
     }
     unsafe fn render(&mut self) {
         self.clear_page();
+        for (i, nav) in self.navigation.iter().enumerate() {
+            let color: *mut AnyObject = if i == self.page {
+                accent()
+            } else {
+                msg_send![class!(NSColor), labelColor]
+            };
+            let _: () = msg_send![nav, setContentTintColor: color];
+            let _: () = msg_send![nav, setBordered: Bool::new(i == self.page)];
+        }
         match self.page {
             0 => self.rules_page(),
             1 => self.sounds_page(),
@@ -525,57 +688,60 @@ impl App {
     }
     unsafe fn rules_page(&mut self) {
         self.header(
-            "Make every notification recognizable.",
-            "Choose an app. Give it a sound. Add a keyword when you need something more specific.",
+            "Sound rules",
+            "A familiar sound for every app. More specific rules go first.",
         );
         button(
             &self.content,
             &self.target,
             "+ New rule",
             30,
-            rect(30., 547., 130., 32.),
+            rect(22., 510., 128., 32.),
         );
-        label(
+        secondary(&label(
             &self.content,
-            "FIRST MATCH WINS",
-            rect(34., 516., 230., 19.),
-            10.,
-            true,
-        );
-        let list = scroll(
-            &self.content,
-            rect(30., 95., 260., 411.),
-            self.settings.rules.len().max(1) as f64 * 64.,
-        );
-        let height = (self.settings.rules.len().max(1) as f64 * 64.).max(411.);
+            &format!("{} rules · first match wins", self.settings.rules.len()),
+            rect(164., 514., 150., 22.),
+            11.,
+            false,
+        ));
+        panel(&self.content, rect(24., 81., 288., 415.));
+        let height = (self.settings.rules.len().max(1) as f64 * 66.).max(395.);
+        let list = scroll(&self.content, rect(30., 91., 276., 395.), height);
         if self.settings.rules.is_empty() {
+            label(
+                &list,
+                "A quieter kind of control.",
+                rect(15., height - 55., 245., 25.),
+                14.,
+                true,
+            );
             secondary(&label(
                 &list,
-                "Your apps, your soundtrack.\nAdd your first rule to get started.",
-                rect(10., 5., 236., 52.),
-                13.,
+                "Start with one app. You can add keywords and fine-tune things later.",
+                rect(15., height - 125., 240., 58.),
+                12.,
                 false,
             ));
         }
         for (i, rule) in self.settings.rules.iter().enumerate() {
-            let prefix = if Some(rule.id) == self.selected {
-                "▸ "
-            } else if rule.enabled {
-                ""
-            } else {
-                "○ "
-            };
-            button(
+            let y = height - (i + 1) as f64 * 66.;
+            let row = button(
                 &list,
                 &self.target,
-                &format!("{prefix}{}", rule.name),
+                &format!("{}  {}", if rule.enabled { "●" } else { "○" }, rule.name),
                 1000 + i as isize,
-                rect(4., height - (i + 1) as f64 * 64. + 27., 246., 30.),
+                rect(8., y + 29., 250., 28.),
             );
+            let _: () = msg_send![&row, setAlignment: 0usize];
+            let _: () = msg_send![&row, setBordered: Bool::new(Some(rule.id)==self.selected)];
+            if Some(rule.id) == self.selected {
+                let _: () = msg_send![&row, setContentTintColor: accent()];
+            }
             secondary(&label(
                 &list,
                 &format!(
-                    "{}  ·  {}",
+                    "{} · {}",
                     rule.app_name,
                     if rule.contains.is_empty() {
                         "All notifications"
@@ -583,7 +749,7 @@ impl App {
                         &rule.contains
                     }
                 ),
-                rect(12., height - (i + 1) as f64 * 64. + 4., 235., 20.),
+                rect(18., y + 5., 235., 20.),
                 11.,
                 false,
             ));
@@ -591,144 +757,64 @@ impl App {
         button(
             &self.content,
             &self.target,
-            "Move up",
+            "↑ Earlier",
             33,
-            rect(30., 46., 122., 30.),
+            rect(22., 29., 137., 30.),
         );
         button(
             &self.content,
             &self.target,
-            "Move down",
+            "↓ Later",
             34,
-            rect(160., 46., 130., 30.),
+            rect(171., 29., 143., 30.),
         );
-        let rule = self
+        if let Some(rule) = self
             .selected
-            .and_then(|id| self.settings.rules.iter().find(|r| r.id == id).cloned());
-        if let Some(rule) = rule {
+            .and_then(|id| self.settings.rules.iter().find(|r| r.id == id).cloned())
+        {
             self.draw_editor(rule);
         } else {
+            panel(&self.content, rect(330., 29., 446., 513.));
+            let mark = label(&self.content, "♫", rect(367., 379., 360., 65.), 49., true);
+            let _: () = msg_send![&mark,setTextColor:accent()];
             label(
                 &self.content,
-                "A little more signal.\nA lot less guessing.",
-                rect(350., 344., 420., 104.),
-                28.,
+                "Make it sound like you.",
+                rect(367., 320., 365., 34.),
+                22.,
                 true,
             );
             secondary(&label(
                 &self.content,
-                "Create a rule to hear which app needs you, without reaching for your screen.",
-                rect(350., 260., 390., 64.),
-                15.,
+                "A subtle ping for Mail. A Wilhelm scream for the group chat. Your call.",
+                rect(367., 248., 354., 60.),
+                14.,
                 false,
             ));
             button(
                 &self.content,
                 &self.target,
-                "Create your first rule",
+                "Create a rule",
                 30,
-                rect(347., 205., 205., 36.),
+                rect(365., 194., 158., 34.),
+            );
+            button(
+                &self.content,
+                &self.target,
+                "Explore sounds",
+                11,
+                rect(533., 194., 171., 34.),
             );
         }
     }
     unsafe fn draw_editor(&mut self, rule: Rule) {
+        panel(&self.content, rect(330., 29., 446., 513.));
         label(
             &self.content,
             "RULE DETAILS",
-            rect(325., 553., 400., 20.),
+            rect(350., 506., 220., 20.),
             10.,
             true,
-        );
-        label(
-            &self.content,
-            "Name",
-            rect(326., 519., 430., 20.),
-            12.,
-            true,
-        );
-        let name = entry(
-            &self.content,
-            &rule.name,
-            "e.g. Work messages",
-            rect(325., 483., 463., 28.),
-        );
-        label(
-            &self.content,
-            "Application",
-            rect(326., 447., 430., 20.),
-            12.,
-            true,
-        );
-        let app = entry(
-            &self.content,
-            &rule.app_name,
-            "Exact name shown on the notification",
-            rect(325., 413., 321., 28.),
-        );
-        button(
-            &self.content,
-            &self.target,
-            "Choose app…",
-            40,
-            rect(655., 411., 134., 32.),
-        );
-        label(
-            &self.content,
-            "Notification contains  ·  optional",
-            rect(326., 376., 450., 20.),
-            12.,
-            true,
-        );
-        let contains = entry(
-            &self.content,
-            &rule.contains,
-            "Person, channel, or keyword",
-            rect(325., 341., 463., 28.),
-        );
-        label(
-            &self.content,
-            "Sound",
-            rect(326., 305., 430., 20.),
-            12.,
-            true,
-        );
-        let popup = frame(class!(NSPopUpButton), rect(322., 268., 325., 30.));
-        let mut found = false;
-        for (i, (name, sound)) in self.sounds.iter().enumerate() {
-            let _: () = msg_send![&popup, addItemWithTitle: &*string(name)];
-            if *sound == rule.sound {
-                let _: () = msg_send![&popup, selectItemAtIndex: i as isize];
-                found = true;
-            }
-        }
-        if !found {
-            self.sounds
-                .push(("Missing sound — choose another".into(), rule.sound.clone()));
-            let _: () =
-                msg_send![&popup, addItemWithTitle: &*string("Missing sound — choose another")];
-            let _: () = msg_send![&popup, selectItemAtIndex: (self.sounds.len()-1) as isize];
-        }
-        add(&self.content, &popup);
-        button(
-            &self.content,
-            &self.target,
-            "▶ Preview",
-            41,
-            rect(657., 267., 132., 32.),
-        );
-        label(
-            &self.content,
-            "Volume",
-            rect(326., 230., 150., 20.),
-            12.,
-            true,
-        );
-        let volume = slider(
-            &self.content,
-            &self.target,
-            rule.volume,
-            49,
-            rect(325., 202., 300., 24.),
         );
         let enabled = check(
             &self.content,
@@ -736,25 +822,124 @@ impl App {
             "Enabled",
             49,
             rule.enabled,
-            rect(665., 200., 120., 25.),
+            rect(669., 502., 92., 25.),
         );
         label(
             &self.content,
-            "Cooldown (seconds)",
-            rect(326., 163., 190., 22.),
-            12.,
+            "Name",
+            rect(350., 471., 390., 18.),
+            11.,
+            true,
+        );
+        let name = entry(
+            &self.content,
+            &rule.name,
+            "Work messages",
+            rect(350., 439., 406., 27.),
+        );
+        label(
+            &self.content,
+            "Application",
+            rect(350., 406., 390., 18.),
+            11.,
+            true,
+        );
+        let app = entry(
+            &self.content,
+            &rule.app_name,
+            "Name shown on the notification",
+            rect(350., 374., 278., 27.),
+        );
+        button(
+            &self.content,
+            &self.target,
+            "Choose…",
+            40,
+            rect(637., 372., 121., 31.),
+        );
+        label(
+            &self.content,
+            "Contains a keyword  ·  optional",
+            rect(350., 342., 390., 18.),
+            11.,
+            true,
+        );
+        let contains = entry(
+            &self.content,
+            &rule.contains,
+            "Person, channel, or keyword",
+            rect(350., 310., 406., 27.),
+        );
+        label(
+            &self.content,
+            "Sound",
+            rect(350., 278., 390., 18.),
+            11.,
+            true,
+        );
+        let popup = frame(class!(NSPopUpButton), rect(347., 243., 297., 30.));
+        let mut found = false;
+        for (i, (name, sound)) in self.sounds.iter().enumerate() {
+            let title = format!("{} · {}", name, sound_category(sound));
+            let _: () = msg_send![&popup,addItemWithTitle:&*string(&title)];
+            if *sound == rule.sound {
+                let _: () = msg_send![&popup,selectItemAtIndex:i as isize];
+                found = true;
+            }
+        }
+        if !found {
+            self.sounds
+                .push(("Missing sound — choose another".into(), rule.sound.clone()));
+            let _: () =
+                msg_send![&popup,addItemWithTitle:&*string("Missing sound — choose another")];
+            let _: () = msg_send![&popup,selectItemAtIndex:(self.sounds.len()-1) as isize];
+        }
+        add(&self.content, &popup);
+        button(
+            &self.content,
+            &self.target,
+            "▶ Preview",
+            41,
+            rect(652., 242., 106., 31.),
+        );
+        label(
+            &self.content,
+            "Volume",
+            rect(350., 209., 100., 18.),
+            11.,
+            true,
+        );
+        let volume = slider(
+            &self.content,
+            &self.target,
+            rule.volume,
+            49,
+            rect(437., 206., 318., 24.),
+        );
+        label(
+            &self.content,
+            "Cooldown",
+            rect(350., 163., 110., 20.),
+            11.,
             true,
         );
         let cooldown = entry(
             &self.content,
             &rule.cooldown_secs.to_string(),
             "1",
-            rect(530., 160., 75., 27.),
+            rect(445., 160., 62., 26.),
         );
         secondary(&label(
             &self.content,
-            "Limits repeated sounds from this rule.",
-            rect(326., 129., 455., 22.),
+            "seconds between sounds",
+            rect(519., 160., 235., 23.),
+            11.,
+            false,
+        ));
+        secondary(&label(
+            &self.content,
+            "Changes apply when you save.",
+            rect(350., 113., 390., 20.),
             11.,
             false,
         ));
@@ -763,23 +948,23 @@ impl App {
             &self.target,
             "Delete",
             32,
-            rect(323., 64., 100., 32.),
+            rect(347., 56., 90., 32.),
         );
         button(
             &self.content,
             &self.target,
             "Test rule",
             42,
-            rect(535., 64., 118., 32.),
+            rect(524., 56., 110., 32.),
         );
         let save = button(
             &self.content,
             &self.target,
             "Save rule",
             31,
-            rect(665., 64., 124., 32.),
+            rect(644., 56., 114., 32.),
         );
-        let _: () = msg_send![&save, setKeyEquivalent: &*string("\r")];
+        let _: () = msg_send![&save,setKeyEquivalent:&*string("\r")];
         self.editor = Some(Editor {
             name,
             app,
@@ -828,154 +1013,347 @@ impl App {
         rule.validate()?;
         Ok(rule)
     }
-    unsafe fn sounds_page(&self) {
-        self.header("Find your sound.","Built-in macOS sounds and your own audio. Imported files are copied into Dunkerfy’s library.");
+    unsafe fn sounds_page(&mut self) {
+        self.header(
+            "Sound library",
+            "30 ready-to-play presets. A little useful. A little ridiculous.",
+        );
+        let search = frame(class!(NSSearchField), rect(24., 508., 461., 30.));
+        set_text(&search, &self.sound_query);
+        let _: () =
+            msg_send![&search,setPlaceholderString:&*string("Find a sound, mood, or category")];
+        let _: () = msg_send![&search,setTarget:&*self.target];
+        let _: () = msg_send![&search,setAction:sel!(action:)];
+        let _: () = msg_send![&search,setTag:51isize];
+        let _: () = msg_send![&search,setSendsSearchStringImmediately:Bool::YES];
+        add(&self.content, &search);
         button(
             &self.content,
             &self.target,
             "Import audio…",
             50,
-            rect(30., 547., 160., 32.),
+            rect(619., 507., 159., 32.),
         );
-        secondary(&label(
+        for (i, title) in ["All", "Fun", "Arcade", "Calm", "macOS", "Imported"]
+            .iter()
+            .enumerate()
+        {
+            let filter = button(
+                &self.content,
+                &self.target,
+                title,
+                90 + i as isize,
+                rect(22. + i as f64 * 105., 459., 98., 29.),
+            );
+            if self.sound_filter == i {
+                primary(&filter);
+            }
+        }
+        let count = label(&self.content, "", rect(24., 425., 750., 20.), 10., true);
+        secondary(&count);
+        self.sound_count = Some(count);
+        let grid = frame(class!(NSView), rect(18., 89., 764., 328.));
+        add(&self.content, &grid);
+        self.sound_grid = Some(grid);
+        self.render_sound_grid();
+        panel(&self.content, rect(24., 23., 752., 55.));
+        let now = label(
             &self.content,
-            "AIFF, WAV, MP3, M4A, CAF · up to 20 MB",
-            rect(212., 550., 550., 25.),
+            "Press play to find your next notification sound.",
+            rect(40., 39., 590., 24.),
             12.,
             false,
-        ));
-        let height = (self.sounds.len() as f64 * 49.).max(475.);
-        let list = scroll(&self.content, rect(30., 40., 760., 475.), height);
-        for (i, (name, sound)) in self.sounds.iter().enumerate() {
+        );
+        secondary(&now);
+        self.now_playing = Some(now);
+        button(
+            &self.content,
+            &self.target,
+            "Stop",
+            52,
+            rect(679., 34., 81., 30.),
+        );
+    }
+    unsafe fn render_sound_grid(&self) {
+        let Some(grid) = &self.sound_grid else {
+            return;
+        };
+        let children: *mut AnyObject = msg_send![grid, subviews];
+        let copy: Obj = msg_send![children, copy];
+        let count: usize = msg_send![&copy, count];
+        for i in 0..count {
+            let child: *mut AnyObject = msg_send![&copy,objectAtIndex:i];
+            let _: () = msg_send![child, removeFromSuperview];
+        }
+        let categories = ["All", "Fun", "Arcade", "Calm", "macOS", "Imported"];
+        let words: Vec<_> = self
+            .sound_query
+            .to_lowercase()
+            .split_whitespace()
+            .map(str::to_owned)
+            .collect();
+        let matches: Vec<_> = self
+            .sounds
+            .iter()
+            .enumerate()
+            .filter(|(_, (name, sound))| {
+                let category = sound_category(sound);
+                let haystack =
+                    format!("{} {} {}", name, category, sound_detail(sound)).to_lowercase();
+                (self.sound_filter == 0 || category == categories[self.sound_filter])
+                    && words.iter().all(|word| haystack.contains(word))
+            })
+            .collect();
+        if let Some(count) = &self.sound_count {
+            set_text(
+                count,
+                &format!(
+                    "{} SOUNDS  /  {}",
+                    matches.len(),
+                    categories[self.sound_filter].to_uppercase()
+                ),
+            );
+        }
+        let rows = matches.len().div_ceil(2);
+        let height = (rows as f64 * 110.).max(328.);
+        let list = scroll(grid, rect(0., 0., 764., 328.), height);
+        if matches.is_empty() {
             label(
                 &list,
-                name,
-                rect(16., height - (i + 1) as f64 * 49. + 10., 475., 25.),
-                14.,
-                false,
+                "Nothing here yet.",
+                rect(22., 245., 690., 30.),
+                18.,
+                true,
             );
+            secondary(&label(
+                &list,
+                "Try a different search or category, or import your own audio.",
+                rect(22., 200., 690., 30.),
+                13.,
+                false,
+            ));
+        }
+        for (position, (index, (name, sound))) in matches.iter().enumerate() {
+            let x = 6. + (position % 2) as f64 * 374.;
+            let y = height - (position / 2 + 1) as f64 * 110. + 8.;
+            panel(&list, rect(x, y, 358., 100.));
+            label(&list, name, rect(x + 15., y + 66., 270., 23.), 14., true);
+            let detail = sound_detail(sound);
+            secondary(&label(
+                &list,
+                &detail,
+                rect(x + 15., y + 40., 334., 23.),
+                11.,
+                false,
+            ));
+            let category = sound_category(sound);
+            let category_label = label(
+                &list,
+                category,
+                rect(x + 15., y + 11., 105., 20.),
+                10.,
+                true,
+            );
+            let _: () = msg_send![&category_label,setTextColor:accent()];
+            let preview = button(
+                &list,
+                &self.target,
+                "Play",
+                2000 + *index as isize,
+                rect(x + 119., y + 7., 79., 27.),
+            );
+            symbol(&preview, "play.fill");
+            let _: () =
+                msg_send![&preview, setAccessibilityLabel: &*string(&format!("Preview {name}"))];
             button(
                 &list,
                 &self.target,
-                "▶ Preview",
-                2000 + i as isize,
-                rect(503., height - (i + 1) as f64 * 49. + 7., 116., 32.),
+                "Use",
+                4000 + *index as isize,
+                rect(x + 204., y + 7., 64., 27.),
             );
             if matches!(sound, Sound::Imported(_)) {
                 button(
                     &list,
                     &self.target,
                     "Delete",
-                    3000 + i as isize,
-                    rect(631., height - (i + 1) as f64 * 49. + 7., 92., 32.),
+                    3000 + *index as isize,
+                    rect(x + 274., y + 7., 77., 27.),
                 );
+            } else if let Sound::Bundled(id) = sound {
+                if let Some(preset) = dunkerfy::catalog::preset(id) {
+                    secondary(&label(
+                        &list,
+                        &format!("{:.1}s", preset.duration),
+                        rect(x + 291., y + 10., 57., 20.),
+                        10.,
+                        false,
+                    ));
+                }
             }
         }
     }
     unsafe fn activity_page(&mut self) {
-        self.header("Know what Dunkerfy heard.","The last 60 events, kept only in memory. Notification text is hidden unless you enable it in Settings.");
+        self.header(
+            "Activity",
+            "A live view of what Dunkerfy hears. Only the last 60 events stay in memory.",
+        );
         button(
             &self.content,
             &self.target,
             "Clear activity",
             60,
-            rect(30., 547., 150., 32.),
+            rect(622., 508., 156., 32.),
         );
-        let scroll = frame(class!(NSScrollView), rect(30., 40., 760., 478.));
-        let _: () = msg_send![&scroll,setHasVerticalScroller:Bool::YES];
-        let text = frame(class!(NSTextView), rect(0., 0., 740., 478.));
-        let _: () = msg_send![&text,setEditable:Bool::NO];
-        let _: () = msg_send![&text,setVerticallyResizable:Bool::YES];
-        let _: () = msg_send![&text,setAutoresizingMask:2usize];
-        let _: () = msg_send![&text,setTextContainerInset:NSSize::new(16.,16.)];
-        let font: *mut AnyObject = msg_send![class!(NSFont),systemFontOfSize:13f64];
-        let _: () = msg_send![&text,setFont:font];
-        let color: *mut AnyObject = msg_send![class!(NSColor), labelColor];
-        let _: () = msg_send![&text,setTextColor:color];
-        let _: () = msg_send![&scroll,setDocumentView:&*text];
-        add(&self.content, &scroll);
-        self.activity_view = Some(text);
+        secondary(&label(
+            &self.content,
+            "LOCAL TO THIS SESSION",
+            rect(24., 513., 530., 20.),
+            10.,
+            true,
+        ));
+        let container = frame(class!(NSView), rect(18., 25., 764., 467.));
+        add(&self.content, &container);
+        self.activity_view = Some(container);
         self.refresh_activity();
     }
     unsafe fn refresh_activity(&self) {
         if let Some(view) = &self.activity_view {
-            let text = if self.activity.is_empty() {
-                "No notifications observed yet.\n\nEnable Accessibility access, then trigger a notification from an app with banners enabled.".into()
-            } else {
-                self.activity
-                    .iter()
-                    .map(|a| {
-                        format!(
-                            "{}  ·  {}\n{}{}\n",
-                            a.time,
-                            a.app,
-                            a.outcome,
-                            if a.detail.is_empty() {
-                                String::new()
-                            } else {
-                                format!("\n{}", a.detail)
-                            }
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            };
-            let _: () = msg_send![&**view,setString:&*string(&text)];
+            let children: *mut AnyObject = msg_send![view, subviews];
+            let copy: Obj = msg_send![children, copy];
+            let count: usize = msg_send![&copy, count];
+            for i in 0..count {
+                let child: *mut AnyObject = msg_send![&copy,objectAtIndex:i];
+                let _: () = msg_send![child, removeFromSuperview];
+            }
+            if self.activity.is_empty() {
+                panel(view, rect(6., 10., 752., 445.));
+                let icon = label(view, "◌", rect(38., 308., 650., 55.), 42., true);
+                let _: () = msg_send![&icon,setTextColor:accent()];
+                label(
+                    view,
+                    "Listening for the next little thing.",
+                    rect(38., 258., 650., 32.),
+                    21.,
+                    true,
+                );
+                secondary(&label(view,"Enable Accessibility access, then trigger a notification from an app with banners turned on. Events will appear here.",rect(38.,173.,620.,67.),13.,false));
+                button(
+                    view,
+                    &self.target,
+                    "Open settings",
+                    13,
+                    rect(36., 112., 158., 32.),
+                );
+                return;
+            }
+            let height = self
+                .activity
+                .iter()
+                .map(|a| if a.detail.is_empty() { 86. } else { 134. })
+                .sum::<f64>()
+                .max(467.);
+            let list = scroll(view, rect(0., 0., 764., 467.), height);
+            let mut y = height;
+            for event in &self.activity {
+                let h = if event.detail.is_empty() { 86. } else { 134. };
+                y -= h;
+                panel(&list, rect(6., y + 7., 732., h - 12.));
+                label(
+                    &list,
+                    &event.app,
+                    rect(22., y + h - 38., 550., 23.),
+                    13.,
+                    true,
+                );
+                secondary(&label(
+                    &list,
+                    &event.time,
+                    rect(644., y + h - 37., 80., 20.),
+                    11.,
+                    false,
+                ));
+                secondary(&label(
+                    &list,
+                    &event.outcome,
+                    rect(22., y + h - 62., 690., 20.),
+                    12.,
+                    false,
+                ));
+                if !event.detail.is_empty() {
+                    secondary(&label(
+                        &list,
+                        &event.detail,
+                        rect(22., y + 15., 690., 48.),
+                        11.,
+                        false,
+                    ));
+                }
+            }
         }
     }
     unsafe fn settings_page(&self) {
-        self.header("Quietly working for you.","Dunkerfy runs locally in your menu bar. No account or analytics. Notification matching works offline.");
+        self.header("Settings", "Set it up once. Let your apps do the talking.");
+        panel(&self.content, rect(24., 377., 752., 165.));
         label(
             &self.content,
-            "01   Allow Accessibility access",
-            rect(32., 540., 745., 28.),
-            18.,
+            "01  Accessibility",
+            rect(43., 499., 500., 24.),
+            15.,
             true,
         );
-        secondary(&label(&self.content,"Dunkerfy reads visible notification banners to identify their app and match your rules. Enable Dunkerfy in System Settings → Privacy & Security → Accessibility.",rect(32.,475.,735.,54.),13.,false));
+        secondary(&label(
+            &self.content,
+            "Allow Dunkerfy to read visible notification banners and match your sound rules.",
+            rect(43., 447., 690., 42.),
+            12.,
+            false,
+        ));
         button(
             &self.content,
             &self.target,
-            "Open Accessibility Settings",
+            "Open Accessibility settings",
             70,
-            rect(29., 427., 250., 34.),
+            rect(40., 394., 246., 32.),
         );
+        panel(&self.content, rect(24., 199., 752., 165.));
         label(
             &self.content,
-            "02   Turn off each app’s original sound",
-            rect(32., 373., 745., 28.),
-            18.,
+            "02  Original notification sounds",
+            rect(43., 321., 690., 24.),
+            15.,
             true,
         );
-        secondary(&label(&self.content,"In Notifications settings, select an app and turn off “Play sound for notification.” Keep banners or alerts enabled. Dunkerfy plays the replacement; it cannot suppress the original sound.",rect(32.,305.,735.,58.),13.,false));
+        secondary(&label(&self.content,"For each app, turn off “Play sound for notification” in macOS. Keep banners enabled. Dunkerfy adds your sound; it cannot mute the original.",rect(43.,267.,690.,44.),12.,false));
         button(
             &self.content,
             &self.target,
-            "Open Notification Settings",
+            "Open Notification settings",
             71,
-            rect(29., 259., 250., 34.),
+            rect(40., 216., 246., 32.),
         );
+        panel(&self.content, rect(24., 25., 752., 161.));
         check(
             &self.content,
             &self.target,
-            "Show notification text in the in-memory activity log",
-            72,
-            self.settings.show_notification_text,
-            rect(32., 207., 740., 26.),
-        );
-        check(
-            &self.content,
-            &self.target,
-            "Launch Dunkerfy at login",
+            "Launch at login",
             73,
             login_enabled(),
-            rect(32., 169., 740., 26.),
+            rect(42., 141., 690., 25.),
+        );
+        check(
+            &self.content,
+            &self.target,
+            "Show notification text in the temporary activity log",
+            72,
+            self.settings.show_notification_text,
+            rect(42., 104., 690., 25.),
         );
         label(
             &self.content,
             "Master volume",
-            rect(32., 121., 160., 24.),
-            13.,
+            rect(43., 58., 147., 22.),
+            12.,
             true,
         );
         slider(
@@ -983,23 +1361,29 @@ impl App {
             &self.target,
             self.settings.master_volume,
             74,
-            rect(198., 120., 420., 25.),
+            rect(209., 56., 527., 25.),
         );
-        secondary(&label(&self.content,"Focus and hidden previews can limit which notifications are available. Closing this window keeps Dunkerfy listening; choose Quit from the menu bar to stop.",rect(32.,37.,735.,58.),12.,false));
     }
     unsafe fn updates_page(&self) {
-        self.header("Keep your sounds up to date.", "Signed updates from Dunkerfy’s official releases. Your rules and imported sounds stay on this Mac.");
+        self.header(
+            "Updates",
+            "Keep things fresh. Your rules and sounds stay right where they are.",
+        );
+        panel(&self.content, rect(24., 178., 752., 364.));
         label(
             &self.content,
-            concat!(
-                "Dunkerfy ",
-                env!("CARGO_PKG_VERSION"),
-                " · Developer preview"
-            ),
-            rect(32., 530., 740., 30.),
-            20.,
+            concat!("Dunkerfy ", env!("CARGO_PKG_VERSION")),
+            rect(44., 489., 690., 31.),
+            21.,
             true,
         );
+        secondary(&label(
+            &self.content,
+            "DEVELOPER PREVIEW",
+            rect(45., 461., 680., 20.),
+            10.,
+            true,
+        ));
         match &self.updater {
             Ok(updater) => {
                 button(
@@ -1007,7 +1391,7 @@ impl App {
                     &self.target,
                     "Check for Updates…",
                     80,
-                    rect(29., 467., 240., 34.),
+                    rect(41., 402., 223., 34.),
                 );
                 check(
                     &self.content,
@@ -1015,7 +1399,7 @@ impl App {
                     "Automatically check for updates",
                     81,
                     updater.checks(),
-                    rect(32., 397., 740., 26.),
+                    rect(44., 346., 690., 25.),
                 );
                 let downloads = check(
                     &self.content,
@@ -1023,23 +1407,23 @@ impl App {
                     "Automatically download and install updates",
                     82,
                     updater.downloads(),
-                    rect(32., 355., 740., 26.),
+                    rect(44., 309., 690., 25.),
                 );
-                let _: () = msg_send![&downloads, setEnabled: Bool::new(updater.checks())];
-                secondary(&label(&self.content, "Automatic checks are off until you enable them. Sparkle checks about once a day when enabled and handles download verification, installation, and relaunch. You can also check manually at any time.", rect(32., 250., 735., 80.), 13., false));
+                let _: () = msg_send![&downloads,setEnabled:Bool::new(updater.checks())];
+                secondary(&label(&self.content,"Automatic checks are opt-in and run about once a day. Every update is verified before installation. You can always check manually.",rect(45.,216.,682.,67.),12.,false));
             }
             Err(error) => {
                 secondary(&label(
                     &self.content,
                     error,
-                    rect(32., 395., 735., 100.),
-                    14.,
+                    rect(44., 302., 690., 114.),
+                    13.,
                     false,
                 ));
             }
         }
-        secondary(&label(&self.content, "Update checks contact dunkerfy.oleary.club; downloads come from GitHub. Notification text, rules, and sound files are never included. No analytics or system-profile reporting.", rect(32., 145., 735., 80.), 13., false));
-        secondary(&label(&self.content, "This is a developer preview. Live notification capture still needs verification. Check the release notes for this build’s signing and validation status.", rect(32., 65., 735., 60.), 12., false));
+        secondary(&label(&self.content,"Checks contact dunkerfy.oleary.club and GitHub. Notification text, rules, and sound files are never sent. No analytics.",rect(26.,100.,744.,55.),12.,false));
+        secondary(&label(&self.content,"Live notification capture still needs verification. See the release notes for signing and validation status.",rect(26.,35.,744.,48.),11.,false));
     }
     unsafe fn may_discard_edits(&self) -> bool {
         let Some(e) = &self.editor else {
@@ -1099,16 +1483,21 @@ impl App {
             30 => {
                 self.page = 0;
                 self.selected = None;
+                self.render();
+                // The empty-state card is replaced by the editable draft.
                 self.clear_page();
-                self.header("Create a sound rule.","Changes are saved only when you choose Save rule. Choose the app’s exact notification name.");
+                self.header(
+                    "New sound rule",
+                    "Choose an app and a sound. Save when it feels right.",
+                );
                 label(
                     &self.content,
-                    "Start with one app.",
-                    rect(32., 476., 260., 36.),
-                    20.,
+                    "One app. Its own voice.",
+                    rect(24., 456., 280., 32.),
+                    18.,
                     true,
                 );
-                secondary(&label(&self.content, "Choose an application, or type the exact app name from its notification banner.\n\nLeave the keyword empty to match every notification from that app.\n\nMore specific rules should go above general rules.", rect(32., 260., 250., 205.), 14., false));
+                secondary(&label(&self.content,"Use the exact name shown on its notifications, or choose the application.\n\nLeave the keyword blank to match every notification.",rect(24.,278.,265.,160.),13.,false));
                 self.draw_editor(Rule::default());
             }
             31 => match self.read_editor() {
@@ -1259,6 +1648,40 @@ impl App {
                     }
                 }
             }
+            51 => {
+                self.sound_query = get_text(sender);
+                self.render_sound_grid();
+            }
+            52 => self.stop_audio(),
+            90..=95 => {
+                self.sound_filter = (tag - 90) as usize;
+                self.render();
+            }
+            4000..=4999 => {
+                if let Some((name, sound)) = self.sounds.get((tag - 4000) as usize).cloned() {
+                    self.stop_audio();
+                    self.page = 0;
+                    self.selected = None;
+                    self.render();
+                    self.clear_page();
+                    self.header(
+                        "New sound rule",
+                        "Your sound is picked. Now give it an app.",
+                    );
+                    label(&self.content, &name, rect(24., 456., 280., 32.), 20., true);
+                    secondary(&label(
+                        &self.content,
+                        &sound_detail(&sound),
+                        rect(24., 385., 265., 60.),
+                        13.,
+                        false,
+                    ));
+                    self.draw_editor(Rule {
+                        sound,
+                        ..Rule::default()
+                    });
+                }
+            }
             60 => {
                 self.activity.clear();
                 self.refresh_activity();
@@ -1350,6 +1773,9 @@ impl App {
         }
     }
     unsafe fn stop_audio(&mut self) {
+        if let Some(label) = &self.now_playing {
+            set_text(label, "Press play to find your next notification sound.");
+        }
         if let Some(player) = self.player.take() {
             let _: Bool = msg_send![&player, stop];
         }
@@ -1365,6 +1791,15 @@ impl App {
             return Err("macOS could not start audio playback.".into());
         }
         self.player = Some(player);
+        if let Some(label) = &self.now_playing {
+            let name = self
+                .sounds
+                .iter()
+                .find(|(_, s)| s == sound)
+                .map(|(n, _)| n.as_str())
+                .unwrap_or("Sound");
+            set_text(label, &format!("Playing  ·  {name}"));
+        }
         Ok(())
     }
     unsafe fn update_status(&self) {
@@ -1372,6 +1807,12 @@ impl App {
         set_text(&self.status_label, &format!("{prefix}{}", self.status));
     }
     unsafe fn tick(&mut self) {
+        if let Some(player) = &self.player {
+            let playing: Bool = msg_send![player, isPlaying];
+            if !playing.as_bool() {
+                self.stop_audio();
+            }
+        }
         for _ in 0..32 {
             let Ok(message) = self.receiver.try_recv() else {
                 break;
@@ -1492,6 +1933,31 @@ unsafe fn set_login(enable: bool) -> Result<(), String> {
 }
 
 /// Draw the app's original vector mark with AppKit at Retina icon resolution.
+// Render actual AppKit views with synthetic data for layout QA, even on a locked Mac.
+unsafe fn render_view(view: &AnyObject, path: &str) {
+    let bounds: NSRect = msg_send![view, bounds];
+    let _: () = msg_send![view, layoutSubtreeIfNeeded];
+    let bitmap: Obj = msg_send![view,bitmapImageRepForCachingDisplayInRect:bounds];
+    let _: () = msg_send![view,cacheDisplayInRect:bounds,toBitmapImageRep:&*bitmap];
+    // NSWindow draws the background outside its content view. Composite that
+    // background explicitly when rendering the view without a visible window.
+    let alloc: Allocated<AnyObject> = msg_send![class!(NSImage), alloc];
+    let image: Obj = msg_send![alloc,initWithSize:bounds.size];
+    let _: () = msg_send![&image, lockFocus];
+    let background: *mut AnyObject = msg_send![class!(NSColor), windowBackgroundColor];
+    let _: () = msg_send![background, setFill];
+    let _: () = msg_send![class!(NSBezierPath),fillRect:bounds];
+    let _: Bool = msg_send![&bitmap,drawInRect:bounds];
+    let _: () = msg_send![&image, unlockFocus];
+    let tiff: *mut AnyObject = msg_send![&image, TIFFRepresentation];
+    let composite: *mut AnyObject = msg_send![class!(NSBitmapImageRep),imageRepWithData:tiff];
+    let properties = new(class!(NSDictionary));
+    let png: *mut AnyObject =
+        msg_send![composite,representationUsingType:4usize,properties:&*properties];
+    let ok: Bool = msg_send![png,writeToFile:&*string(path),atomically:Bool::YES];
+    assert!(ok.as_bool(), "Could not render native UI");
+}
+
 unsafe fn write_icon(path: &str) {
     let allocated: Allocated<AnyObject> = msg_send![class!(NSImage), alloc];
     let image: Obj = msg_send![allocated, initWithSize: NSSize::new(1024., 1024.)];

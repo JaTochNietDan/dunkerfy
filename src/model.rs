@@ -6,13 +6,14 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum Sound {
+    Bundled(String),
     System(String),
     Imported(String),
 }
 
 impl Default for Sound {
     fn default() -> Self {
-        Self::System("Glass".into())
+        Self::Bundled("bubble".into())
     }
 }
 
@@ -86,6 +87,11 @@ impl Rule {
 
 pub fn validate_sound(sound: &Sound) -> Result<(), String> {
     let name = match sound {
+        Sound::Bundled(s) => {
+            return crate::catalog::preset(s)
+                .map(|_| ())
+                .ok_or_else(|| "Unknown bundled sound.".into());
+        }
         Sound::System(s) | Sound::Imported(s) => s,
     };
     if name.is_empty() || name.contains('/') || name.contains('\\') || name == "." || name == ".." {

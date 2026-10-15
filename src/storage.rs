@@ -88,6 +88,19 @@ impl Storage {
     pub fn sound_path(&self, sound: &Sound) -> Result<PathBuf, String> {
         validate_sound(sound)?;
         Ok(match sound {
+            Sound::Bundled(id) => {
+                let executable = std::env::current_exe().map_err(|e| e.to_string())?;
+                let parent = executable.parent().ok_or("Missing executable directory")?;
+                let resources = if parent.file_name().is_some_and(|n| n == "MacOS") {
+                    parent
+                        .parent()
+                        .ok_or("Missing bundle directory")?
+                        .join("Resources/Sounds")
+                } else {
+                    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Resources/Sounds")
+                };
+                resources.join(format!("{id}.wav"))
+            }
             Sound::System(name) => {
                 PathBuf::from("/System/Library/Sounds").join(format!("{name}.aiff"))
             }
@@ -95,18 +108,23 @@ impl Storage {
         })
     }
     pub fn sounds(&self) -> Vec<(String, Sound)> {
-        let mut result = Vec::new();
+        let mut result: Vec<_> = crate::catalog::PRESETS
+            .iter()
+            .map(|p| (p.name.clone(), Sound::Bundled(p.id.clone())))
+            .collect();
+        let mut system = Vec::new();
         if let Ok(entries) = fs::read_dir("/System/Library/Sounds") {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.extension().is_some_and(|e| e == "aiff") {
                     if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                        result.push((name.to_string(), Sound::System(name.to_string())));
+                        system.push((name.to_string(), Sound::System(name.to_string())));
                     }
                 }
             }
         }
-        result.sort_by(|a, b| a.0.cmp(&b.0));
+        system.sort_by(|a, b| a.0.cmp(&b.0));
+        result.extend(system);
         if let Ok(entries) = fs::read_dir(self.root.join("Sounds")) {
             let mut imported = Vec::new();
             for entry in entries.flatten() {

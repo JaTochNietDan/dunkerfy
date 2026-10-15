@@ -44,3 +44,12 @@ The 0.2.0 source adds Sparkle 2.10.0 through mise, a Rust Objective-C bridge, a 
 Passed: eight logic tests, formatting, strict clippy, release packaging and deep code-signature verification, all five native pages/editor construction, and bundled Sparkle startup with the configured feed/public key. The update-security integration test uses a disposable test key with the actual Sparkle tools: valid signed feed/archive accepted, same-size tampered archive rejected, modified signed feed rejected. Test keys are removed afterward.
 
 Pending: Apple Developer portal sign-in and Developer ID Application certificate creation, notarization credentials, Keychain approval for the production update-signing tools, and actual download/install/relaunch testing. The first production appcast generation waited on Keychain access and was stopped; no feed or 0.2.0 release has been published. The live site and published download remain 0.1.0. This is an implementation milestone, not a verified shipping auto-update release.
+
+## Compact UI and sound bank — 2026-10-15
+
+- Reduced the content window from 1040 × 720 to 980 × 660 and rebuilt all five native pages with an icon sidebar, rounded panels, teal primary actions, compact forms, and a two-column soundboard.
+- Added 30 bundled PCM sounds: the attributed CC0 Wilhelm excerpt and 29 reproducible original effects. Search, category filters, preview/stop feedback, and sound-to-rule drafts are implemented. Existing system/imported sound references remain compatible.
+- Ten Rust integration tests cover the existing rule/storage behavior plus catalog uniqueness, unknown-ID rejection, actual WAV format/duration/peak bounds, quiet edges, non-silence, no writes to user storage when resolving presets, and legacy sound deserialization. Strict clippy and formatting pass.
+- Packaged native smoke test constructs all five pages, decodes all 30 presets through NSSound and verifies their duration, filters down to Wilhelm, and creates the expected rule draft. It does not play every sound or claim a listening review.
+- Actual AppKit views were rendered with synthetic rules into ignored `dist/ui-preview/` and visually checked in light and dark appearances. These are offscreen UI renders, not screen captures or real notification evidence; they are not published on the website.
+- Production signing, actual update installation/relaunch, live notification capture, and interactive keyboard/VoiceOver checks remain pending. The release remains unpublished while Apple account setup is pending.

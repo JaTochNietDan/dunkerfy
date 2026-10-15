@@ -51,7 +51,7 @@ mise exec -- cargo clippy --all-targets -- -D warnings
 mise exec -- cargo run -- --smoke-test
 ```
 
-The native smoke test constructs all four pages and the rule editor without writing settings or playing audio. It requires a logged-in macOS GUI session. The unit tests cover matching, priority, cooldown, pause, disabled rules, notification parsing, validation, atomic persistence, corruption preservation, and audio copying.
+The native smoke test constructs all five pages and the rule editor without writing settings or playing audio, decodes every bundled preset, checks library search, and opens a sound-specific rule draft. `mise run ui-preview` renders light/dark AppKit views with synthetic rules into ignored `dist/ui-preview/`, including on a locked Mac. Tests also cover catalog assets, PCM peaks/durations, and compatibility with existing sound references.
 
 The bundle script targets the current machine’s architecture and ad-hoc signs the app for local use. To distribute outside your machine, use your own Developer ID via `DUNKERFY_SIGNING_IDENTITY`, then notarize and staple with your Apple developer credentials. An ad-hoc signature is not a notarized public release. Rebuilding or relocating an ad-hoc signed app may require removing and re-adding its Accessibility permission.
 
@@ -85,6 +85,8 @@ Notification content is processed locally for matching. Activity retains at most
 
 - `src/model.rs`: serializable settings, validation, matching, and cooldown engine.
 - `src/storage.rs`: persistence and sound library operations.
+- `src/catalog.rs` and `Resources/Sounds/`: bundled presets and provenance.
+- `scripts/generate-sounds.mjs`: reproducible original sound synthesis (Node through mise).
 - `src/monitor.rs`: thread-confined Core Foundation/Accessibility bindings and banner monitoring.
 - `src/mac.rs`: AppKit UI, audio, login items, and event handling.
 - `tests/logic.rs`: deterministic logic and filesystem tests.

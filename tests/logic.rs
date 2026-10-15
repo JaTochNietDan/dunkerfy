@@ -173,3 +173,62 @@ fn audio_import_copies_file() {
     fs::write(&invalid, "text").unwrap();
     assert!(f.0.import_sound(&invalid).is_err());
 }
+
+#[test]
+fn bundled_sound_bank_is_complete_and_safe() {
+    let f = Fixture::new();
+    let mut ids = std::collections::HashSet::new();
+    assert_eq!(dunkerfy::catalog::PRESETS.len(), 30);
+    for preset in dunkerfy::catalog::PRESETS.iter() {
+        assert!(ids.insert(&preset.id));
+        let sound = Sound::Bundled(preset.id.clone());
+        assert!(validate_sound(&sound).is_ok());
+        let bytes = fs::read(f.0.sound_path(&sound).unwrap()).unwrap();
+        assert_eq!(&bytes[..4], b"RIFF");
+        assert_eq!(&bytes[8..12], b"WAVE");
+        assert_eq!(u16::from_le_bytes(bytes[20..22].try_into().unwrap()), 1);
+        assert_eq!(u16::from_le_bytes(bytes[22..24].try_into().unwrap()), 1);
+        assert_eq!(u32::from_le_bytes(bytes[24..28].try_into().unwrap()), 44100);
+        assert_eq!(u16::from_le_bytes(bytes[34..36].try_into().unwrap()), 16);
+        let frames: Vec<i16> = bytes[44..]
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|s| i16::from_le_bytes([s[0], s[1]]))
+            .collect();
+        assert!((frames.len() as f64 / 44100. - preset.duration).abs() < 0.001);
+        assert!(preset.duration < 2.0);
+        assert!(frames.iter().all(|s| i32::from(*s).abs() <= 22938));
+        assert!(frames.iter().any(|s| i32::from(*s).abs() > 1000));
+        assert_eq!(frames[0], 0);
+        assert_eq!(*frames.last().unwrap(), 0);
+    }
+    assert!(f.0.sound_path(&Sound::Bundled("../bad".into())).is_err());
+    assert!(f
+        .0
+        .sound_path(&Sound::Bundled("not-a-preset".into()))
+        .is_err());
+    assert!(
+        !f.0.root.exists(),
+        "Bundled sounds must not create or overwrite user files"
+    );
+}
+
+#[test]
+fn bundled_rules_roundtrip_and_legacy_sounds_still_load() {
+    let f = Fixture::new();
+    let settings = Settings {
+        rules: vec![rule("Mail", "")],
+        ..Settings::default()
+    };
+    f.0.save(&settings).unwrap();
+    assert_eq!(
+        f.0.load().unwrap().rules[0].sound,
+        Sound::Bundled("bubble".into())
+    );
+    let legacy: Sound = serde_json::from_str(r#"{"kind":"system","value":"Glass"}"#).unwrap();
+    assert_eq!(legacy, Sound::System("Glass".into()));
+    let imported: Sound =
+        serde_json::from_str(r#"{"kind":"imported","value":"test--id.wav"}"#).unwrap();
+    assert_eq!(imported, Sound::Imported("test--id.wav".into()));
+}

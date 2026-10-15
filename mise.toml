@@ -31,3 +31,10 @@ run = "bash scripts/prepare-release.sh"
 
 [tasks.update-test]
 run = "node scripts/test-updates.mjs"
+
+[tasks.sounds-generate]
+run = "node scripts/generate-sounds.mjs"
+
+[tasks.ui-preview]
+depends = ["build"]
+run = "dist/Dunkerfy.app/Contents/MacOS/dunkerfy --render-ui dist/ui-preview"
