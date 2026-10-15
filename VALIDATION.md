@@ -23,3 +23,16 @@ Not yet verified:
 - UI interaction with the final unsaved-edit confirmation and duplicate-launch behavior. These compile and the updated native construction smoke test passed; the Mac locked before further interaction was possible.
 
 The earlier test instance was stopped after building the final bundle. Unlock the Mac, open the final app, grant Accessibility access using the in-app Settings instructions, and trigger a banner from an app with a configured rule to complete live integration testing.
+
+## Publication verification
+
+Published on 2026-10-15:
+
+- Public repository: https://github.com/JaTochNietDan/dunkerfy. GitHub Actions are disabled.
+- Developer preview: https://github.com/JaTochNietDan/dunkerfy/releases/tag/v0.1.0. Downloaded the public ZIP and verified it against the published SHA256SUMS.
+- Website: https://dunkerfy.oleary.club, Cloudflare Worker `oleary-dunkerfy`, version `b79fd6e7-eb2d-43d2-a2df-6ecec53f1d21`. All six public assets match local source byte for byte; security headers verified.
+- Local browser inspection confirmed the landing page layout and click-to-play sound demo. App screenshots are intentionally omitted at the owner's request while the Mac is locked.
+- Reviewed Terraform plan added exactly one custom domain, with no updates or deletions. The full post-apply plan is clean. All 39 pre-existing DNS records were unchanged.
+- The oleary.club homepage now includes Dunkerfy in its preview collection. Published index matches the generated output.
+
+Publication does not change the live-capture, signing, or platform limitations listed above.
