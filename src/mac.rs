@@ -142,6 +142,7 @@ struct Activity {
     time: String,
 }
 struct App {
+    updater: Result<crate::updater::Updater, String>,
     application: Obj,
     target: Obj,
     window: Obj,
@@ -206,9 +207,28 @@ extern "C" fn reopen(_: *mut AnyObject, _: Sel, _: *mut AnyObject, _: Bool) -> B
     Bool::YES
 }
 
+extern "C" fn should_terminate(_: *mut AnyObject, _: Sel, _: *mut AnyObject) -> usize {
+    // Sparkle's relaunch also goes through NSApplication termination.
+    STATE.with(|state| {
+        let Ok(state) = state.try_borrow() else {
+            return 0;
+        };
+        if state
+            .as_ref()
+            .is_none_or(|app| unsafe { app.may_discard_edits() })
+        {
+            1
+        } else {
+            0
+        }
+    })
+}
+
 pub fn run() {
     autoreleasepool(|_| unsafe {
-        if !std::env::args().any(|arg| arg == "--smoke-test" || arg == "--write-icon") {
+        if !std::env::args().any(|arg| {
+            arg == "--smoke-test" || arg == "--updater-smoke-test" || arg == "--write-icon"
+        }) {
             let bundle: *mut AnyObject = msg_send![class!(NSBundle), mainBundle];
             let identifier: *mut NSString = msg_send![bundle, bundleIdentifier];
             if !identifier.is_null() {
@@ -232,6 +252,12 @@ pub fn run() {
             write_icon(&path);
             return;
         }
+        if std::env::args().any(|a| a == "--updater-smoke-test") {
+            let updater = crate::updater::Updater::new(true).expect("Packaged updater must start");
+            assert!(updater.can_check(), "Updater must allow a manual check");
+            println!("Sparkle loaded and started with the packaged feed and public key.");
+            return;
+        }
         let _: Bool = msg_send![&application, setActivationPolicy: 0isize];
         let name = CString::new("DunkerfyController").unwrap();
         let mut builder =
@@ -247,6 +273,10 @@ pub fn run() {
         builder.add_method(
             sel!(applicationShouldHandleReopen:hasVisibleWindows:),
             reopen as extern "C" fn(*mut AnyObject, Sel, *mut AnyObject, Bool) -> Bool,
+        );
+        builder.add_method(
+            sel!(applicationShouldTerminate:),
+            should_terminate as extern "C" fn(*mut AnyObject, Sel, *mut AnyObject) -> usize,
         );
         let target = new(builder.register());
         let _: () = msg_send![&application, setDelegate: &*target];
@@ -289,9 +319,15 @@ pub fn run() {
             12.,
             false,
         ));
-        for (i, title) in ["Sound rules", "Sound library", "Activity", "Settings"]
-            .iter()
-            .enumerate()
+        for (i, title) in [
+            "Sound rules",
+            "Sound library",
+            "Activity",
+            "Settings",
+            "Updates",
+        ]
+        .iter()
+        .enumerate()
         {
             button(
                 &sidebar,
@@ -329,6 +365,7 @@ pub fn run() {
         );
         let content = frame(class!(NSView), rect(210., 0., 830., 720.));
         add(root, &content);
+        let updater = crate::updater::Updater::new(!std::env::args().any(|a| a == "--smoke-test"));
         let menu = new(class!(NSMenu));
         menu_item(&menu, &target, "Open Dunkerfy", 1, "");
         let menu_pause = menu_item(
@@ -338,6 +375,11 @@ pub fn run() {
             20,
             "",
         );
+        let update_item = menu_item(&menu, &target, "Check for Updates…", 80, "");
+        if let Ok(ref updater) = updater {
+            let _: () = msg_send![&update_item, setTarget: &*updater.controller];
+            let _: () = msg_send![&update_item, setAction: sel!(checkForUpdates:)];
+        }
         menu_item(&menu, &target, "Quit Dunkerfy", 2, "q");
         let bar: *mut AnyObject = msg_send![class!(NSStatusBar), systemStatusBar];
         let status_item: Obj = msg_send![bar, statusItemWithLength: -1f64];
@@ -372,6 +414,7 @@ pub fn run() {
         let sounds = storage.sounds();
         let selected = settings.rules.first().map(|r| r.id);
         let mut app = App {
+            updater,
             application: application.clone(),
             target,
             window,
@@ -397,7 +440,7 @@ pub fn run() {
         };
         app.render();
         if std::env::args().any(|arg| arg == "--smoke-test") {
-            for page in 0..4 {
+            for page in 0..5 {
                 app.page = page;
                 app.render();
             }
@@ -405,7 +448,7 @@ pub fn run() {
             app.clear_page();
             app.draw_editor(Rule::default());
             println!(
-                "Native AppKit smoke test passed: four pages, editor, menu, and login service."
+                "Native AppKit smoke test passed: five pages, editor, menu, login service, and updater construction."
             );
             let _: () = msg_send![&app._timer, invalidate];
             return;
@@ -476,7 +519,8 @@ impl App {
             0 => self.rules_page(),
             1 => self.sounds_page(),
             2 => self.activity_page(),
-            _ => self.settings_page(),
+            3 => self.settings_page(),
+            _ => self.updates_page(),
         }
     }
     unsafe fn rules_page(&mut self) {
@@ -880,7 +924,7 @@ impl App {
         }
     }
     unsafe fn settings_page(&self) {
-        self.header("Quietly working for you.","Dunkerfy runs locally in your menu bar. No account, analytics, or network connection required.");
+        self.header("Quietly working for you.","Dunkerfy runs locally in your menu bar. No account or analytics. Notification matching works offline.");
         label(
             &self.content,
             "01   Allow Accessibility access",
@@ -943,6 +987,60 @@ impl App {
         );
         secondary(&label(&self.content,"Focus and hidden previews can limit which notifications are available. Closing this window keeps Dunkerfy listening; choose Quit from the menu bar to stop.",rect(32.,37.,735.,58.),12.,false));
     }
+    unsafe fn updates_page(&self) {
+        self.header("Keep your sounds up to date.", "Signed updates from Dunkerfy’s official releases. Your rules and imported sounds stay on this Mac.");
+        label(
+            &self.content,
+            concat!(
+                "Dunkerfy ",
+                env!("CARGO_PKG_VERSION"),
+                " · Developer preview"
+            ),
+            rect(32., 530., 740., 30.),
+            20.,
+            true,
+        );
+        match &self.updater {
+            Ok(updater) => {
+                button(
+                    &self.content,
+                    &self.target,
+                    "Check for Updates…",
+                    80,
+                    rect(29., 467., 240., 34.),
+                );
+                check(
+                    &self.content,
+                    &self.target,
+                    "Automatically check for updates",
+                    81,
+                    updater.checks(),
+                    rect(32., 397., 740., 26.),
+                );
+                let downloads = check(
+                    &self.content,
+                    &self.target,
+                    "Automatically download and install updates",
+                    82,
+                    updater.downloads(),
+                    rect(32., 355., 740., 26.),
+                );
+                let _: () = msg_send![&downloads, setEnabled: Bool::new(updater.checks())];
+                secondary(&label(&self.content, "Automatic checks are off until you enable them. Sparkle checks about once a day when enabled and handles download verification, installation, and relaunch. You can also check manually at any time.", rect(32., 250., 735., 80.), 13., false));
+            }
+            Err(error) => {
+                secondary(&label(
+                    &self.content,
+                    error,
+                    rect(32., 395., 735., 100.),
+                    14.,
+                    false,
+                ));
+            }
+        }
+        secondary(&label(&self.content, "Update checks contact dunkerfy.oleary.club; downloads come from GitHub. Notification text, rules, and sound files are never included. No analytics or system-profile reporting.", rect(32., 145., 735., 80.), 13., false));
+        secondary(&label(&self.content, "This is a developer preview. Live notification capture still needs verification. Check the release notes for this build’s signing and validation status.", rect(32., 65., 735., 60.), 12., false));
+    }
     unsafe fn may_discard_edits(&self) -> bool {
         let Some(e) = &self.editor else {
             return true;
@@ -969,15 +1067,15 @@ impl App {
         answer == 1001
     }
     unsafe fn action(&mut self, tag: isize, sender: &AnyObject) {
-        if matches!(tag, 2 | 10..=13 | 30 | 33..=34 | 1000..=1999) && !self.may_discard_edits() {
+        if matches!(tag, 10..=14 | 30 | 33..=34 | 1000..=1999) && !self.may_discard_edits() {
             return;
         }
         match tag {
             1 => self.show(),
             2 => {
-                let _: () = msg_send![&self.application,terminate:ptr::null::<AnyObject>()];
+                let _: () = msg_send![&self.application, performSelector: sel!(terminate:), withObject: ptr::null::<AnyObject>(), afterDelay: 0.0f64];
             }
-            10..=13 => {
+            10..=14 => {
                 self.page = (tag - 10) as usize;
                 self.render();
             }
@@ -1192,6 +1290,21 @@ impl App {
                 let mut s = self.settings.clone();
                 s.master_volume = value as f32;
                 self.commit(s);
+            }
+            80 => match &self.updater {
+                Ok(updater) => updater.check(),
+                Err(error) => alert("Updates unavailable", error),
+            },
+            81 | 82 => {
+                let value: isize = msg_send![sender, state];
+                if let Ok(updater) = &self.updater {
+                    if tag == 81 {
+                        updater.set_checks(value == 1);
+                    } else {
+                        updater.set_downloads(value == 1 && updater.checks());
+                    }
+                }
+                self.render();
             }
             1000..=1999 => {
                 if let Some(rule) = self.settings.rules.get((tag - 1000) as usize) {

@@ -7,10 +7,18 @@
 <key>CFBundleExecutable</key><string>dunkerfy</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.1.0</string>
-<key>CFBundleVersion</key><string>1</string>
+<key>CFBundleShortVersionString</key><string>0.2.0</string>
+<key>CFBundleVersion</key><string>2</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSPrincipalClass</key><string>NSApplication</string>
 <key>NSAccessibilityUsageDescription</key><string>Dunkerfy reads notification banners to play the sound you choose for each app.</string>
+<key>SUFeedURL</key><string>https://dunkerfy.oleary.club/appcast.xml</string>
+<key>SUPublicEDKey</key><string>x7JkT6qEzVwdQCF4OFMG/rjLj3c9/sCEyn8MxoaBlbU=</string>
+<key>SUEnableAutomaticChecks</key><false/>
+<key>SUAutomaticallyUpdate</key><false/>
+<key>SUAllowsAutomaticUpdates</key><true/>
+<key>SUEnableSystemProfiling</key><false/>
+<key>SUVerifyUpdateBeforeExtraction</key><true/>
+<key>SURequireSignedFeed</key><true/>
 </dict></plist>

@@ -101,7 +101,7 @@ The smoke test constructs the native UI without playing audio or saving rules. G
 
 Rules and preferences live in `~/Library/Application Support/Dunkerfy/settings.json`. Imported audio is copied into the adjacent `Sounds/` directory.
 
-Notification text is processed locally. Activity hides it by default, never writes it to disk, and clears retained text when you turn that option off. The application has no analytics or network requests.
+Notification text is processed locally. Activity hides it by default, never writes it to disk, and clears retained text when you turn that option off. The application has no analytics. In the upcoming 0.2.0 build, optional update checks contact the Dunkerfy website and GitHub; these requests never include notification content, rules, or sounds.
 
 ## Project map
 
@@ -126,3 +126,9 @@ Dunkerfy is an independent project inspired by the idea of per-app notification 
 ## License
 
 [MIT](LICENSE) · Robert O’Leary and contributors.
+
+## In-app updates (0.2.0 development)
+
+Sparkle is integrated directly from Rust, with an Updates page, Check for Updates menu item, opt-in automatic checks and installation, and signed feeds/downloads. Apple distribution-signing setup and a full installation/relaunch test are pending; the published download above remains 0.1.0. Existing users will install the first updater-enabled release manually once.
+
+See [update and signing setup](docs/UPDATES.md) for the mise-managed release workflow.

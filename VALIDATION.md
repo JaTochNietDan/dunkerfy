@@ -36,3 +36,11 @@ Published on 2026-10-15:
 - The oleary.club homepage now includes Dunkerfy in its preview collection. Published index matches the generated output.
 
 Publication does not change the live-capture, signing, or platform limitations listed above.
+
+## Updater implementation — 2026-10-15
+
+The 0.2.0 source adds Sparkle 2.10.0 through mise, a Rust Objective-C bridge, a native Updates page, opt-in automatic checks/installation, and a menu item. Both signed feeds and pre-extraction archive verification are required. The release signing key was created in the login Keychain; only its public key is in source.
+
+Passed: eight logic tests, formatting, strict clippy, release packaging and deep code-signature verification, all five native pages/editor construction, and bundled Sparkle startup with the configured feed/public key. The update-security integration test uses a disposable test key with the actual Sparkle tools: valid signed feed/archive accepted, same-size tampered archive rejected, modified signed feed rejected. Test keys are removed afterward.
+
+Pending: Apple Developer portal sign-in and Developer ID Application certificate creation, notarization credentials, Keychain approval for the production update-signing tools, and actual download/install/relaunch testing. The first production appcast generation waited on Keychain access and was stopped; no feed or 0.2.0 release has been published. The live site and published download remain 0.1.0. This is an implementation milestone, not a verified shipping auto-update release.

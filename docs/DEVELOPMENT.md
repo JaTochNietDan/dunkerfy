@@ -79,7 +79,7 @@ Settings: `~/Library/Application Support/Dunkerfy/settings.json`
 
 Imported sounds: `~/Library/Application Support/Dunkerfy/Sounds/`
 
-Notification content is processed locally for matching. Activity retains at most 60 entries in memory, never on disk. If you opt into showing notification text, turning the option off clears the text already retained. No application code sends network requests or analytics.
+Notification content is processed locally for matching. Activity retains at most 60 entries in memory, never on disk. If you opt into showing notification text, turning the option off clears the text already retained. Optional Sparkle update checks contact the website and GitHub. Notification content, rules, and sounds are never sent; analytics and system-profile reporting are disabled.
 
 ## Source map
 

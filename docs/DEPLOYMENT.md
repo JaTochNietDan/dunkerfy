@@ -37,3 +37,7 @@ Updates to the site need only a Wrangler deploy. For rollback, redeploy the prev
 Run local tests, lint, and `mise run build`. The build produces a locally signed `dist/Dunkerfy.app`. Package it with the macOS `ditto` utility and publish a GitHub release. The initial release is explicitly marked as a developer preview, with its live-capture and notarization limitations stated on both the website and release page.
 
 Only promote a future build to a verified stable release after live notification testing and the required signing/notarization work. Keep download URLs, version labels, and validation notes in sync.
+
+## Updater-enabled releases
+
+For 0.2.0 and later, use `mise run release-prepare` and follow [UPDATES.md](UPDATES.md). This embeds Sparkle, signs/notarizes nested code, and generates a signed appcast. Publish the immutable GitHub archive first, verify the public download, then deploy the signed feed to Cloudflare. Never deploy a feed referring to an unavailable release.
