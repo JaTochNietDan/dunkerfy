@@ -1,0 +1,8 @@
+{
+  "name": "oleary-dunkerfy",
+  "account_id": "e78e0111cdb60c145307f1333efbc9ce",
+  "compatibility_date": "2026-10-03",
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": { "directory": "./website" }
+}

@@ -1,0 +1,26 @@
+[tools]
+node = "22.23.2"
+"npm:wrangler" = "4.142.0"
+rust = { version = "1.99.0", profile = "minimal", components = ["rustfmt", "clippy"] }
+
+[settings.rust]
+rustup_home = ".mise/rustup"
+cargo_home = ".mise/cargo"
+
+[tasks.build]
+run = "bash scripts/build-app.sh"
+
+[tasks.test]
+run = "cargo test"
+
+[tasks.check]
+run = "cargo clippy --all-targets -- -D warnings"
+
+[tasks.site-dev]
+run = "wrangler dev --config wrangler.jsonc --port 5176"
+
+[tasks.site-check]
+run = "node scripts/check-site.mjs"
+
+[tasks.site-deploy]
+run = "wrangler deploy --config wrangler.jsonc"
