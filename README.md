@@ -6,7 +6,7 @@
 <p align="center">A native macOS utility for custom notification sounds, written in Rust.<br>Give your inbox, team mentions, and finished builds sounds you recognize.</p>
 <p align="center">
   <a href="https://dunkerfy.oleary.club">Website</a> ·
-  <a href="https://github.com/JaTochNietDan/dunkerfy/releases/tag/v0.1.0">Download preview</a> ·
+  <a href="https://github.com/JaTochNietDan/dunkerfy/releases/tag/v0.2.1">Download preview</a> ·
   <a href="#setup">Setup</a> ·
   <a href="#build-from-source">Build</a> ·
   <a href="https://github.com/JaTochNietDan/dunkerfy/issues">Report an issue</a>
@@ -41,9 +41,9 @@ These are illustrative rules, not a list of verified app integrations. The sourc
 
 ## Download
 
-**[Download v0.1.0 for Apple Silicon](https://github.com/JaTochNietDan/dunkerfy/releases/download/v0.1.0/Dunkerfy-macOS-arm64.zip)** · macOS 13 or later
+**[Download v0.2.1 for Apple Silicon](https://github.com/JaTochNietDan/dunkerfy/releases/download/v0.2.1/Dunkerfy-0.2.1-macOS-arm64.zip)** · macOS 13 or later
 
-> **Developer preview:** this is an early release. The app is ad-hoc signed, **not Apple-notarized**, so macOS may block it. Rule logic, storage, native UI construction, and simulated sound playback have been tested. **Live third-party notification capture has not yet been verified.** See [validation results](VALIDATION.md) for the exact scope.
+> **Developer preview:** this is an early release. The app is **Developer ID signed and Apple-notarized**. Rule logic, storage, native UI construction, and simulated sound playback have been tested. **Live third-party notification capture has not yet been verified.** See [validation results](VALIDATION.md) for the exact scope.
 
 The downloadable build is for Apple Silicon. Intel builds and compatibility across macOS versions have not been tested. You can also build the source locally.
 
@@ -101,7 +101,7 @@ The smoke test constructs the native UI without playing audio or saving rules. G
 
 Rules and preferences live in `~/Library/Application Support/Dunkerfy/settings.json`. Imported audio is copied into the adjacent `Sounds/` directory.
 
-Notification text is processed locally. Activity hides it by default, never writes it to disk, and clears retained text when you turn that option off. The application has no analytics. In the upcoming 0.2.0 build, optional update checks contact the Dunkerfy website and GitHub; these requests never include notification content, rules, or sounds.
+Notification text is processed locally. Activity hides it by default, never writes it to disk, and clears retained text when you turn that option off. The application has no analytics. Optional update checks contact the Dunkerfy website and GitHub; these requests never include notification content, rules, or sounds.
 
 ## Project map
 
@@ -127,16 +127,16 @@ Dunkerfy is an independent project inspired by the idea of per-app notification 
 
 [MIT](LICENSE) · Robert O’Leary and contributors.
 
-## In-app updates (0.2.0 development)
+## In-app updates
 
-Sparkle is integrated directly from Rust, with an Updates page, Check for Updates menu item, opt-in automatic checks and installation, and signed feeds/downloads. Apple distribution-signing setup and a full installation/relaunch test are pending; the published download above remains 0.1.0. Existing users will install the first updater-enabled release manually once.
+Sparkle is integrated directly from Rust, with an Updates page, Check for Updates menu item, opt-in automatic checks and installation, and signed feeds/downloads. Version 0.2.1 is Developer ID signed and notarized, with a signed production update feed. A full installation/relaunch test is still pending. Users of 0.1.0 must install manually; 0.2.0 includes Check for Updates.
 
 See [update and signing setup](docs/UPDATES.md) for the mise-managed release workflow.
 
-## Compact UI and sound bank (0.2.0 development)
+## Compact UI and sound bank
 
 The native interface now uses a smaller 964 × 620 window, an icon sidebar, rounded panels, teal actions, and light/dark styling. The soundboard has search, category filters, previews with a Stop control, and a Use action to create a rule with your chosen sound.
 
 Thirty sounds ship with the app: the CC0 **Wilhelm scream** plus 29 original effects. Fun presets include sad trombone, air horn, ba dum tss, record scratch, rubber boing, slide whistle, rubber duck, whoopee, tiny violin, crickets, and a dramatic sting. Arcade cues include coin, level up, power up, game over, pew pew, checkpoint, combo breaker, and pixel hop. Seven calmer tones round out the bank. Existing macOS and imported sounds remain available.
 
-See [audio attribution](Resources/Sounds/ATTRIBUTION.md). The original effects can be regenerated with `mise run sounds-generate`. `mise run ui-preview` renders the actual AppKit views using sample rules for local layout review; it does not capture your screen or notification contents. These features are in source and the local development build; the published v0.1.0 download does not include them yet.
+See [audio attribution](Resources/Sounds/ATTRIBUTION.md). The original effects can be regenerated with `mise run sounds-generate`. `mise run ui-preview` renders the actual AppKit views using sample rules for local layout review; it does not capture your screen or notification contents.

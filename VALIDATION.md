@@ -59,3 +59,10 @@ Pending: Apple Developer portal sign-in and Developer ID Application certificate
 - Reduced sidebar row pitch from 43 to 30 points, button height from 34 to 27 points, and sidebar width from 180 to 164 points.
 - Reduced window size to 964 × 620 and tightened branding, page headings, and listener controls.
 - Release build and native five-page smoke test passed. Rendered all five pages in both appearances and visually checked Rules in light mode and Sounds in dark mode for clipping and spacing.
+
+### 0.2.1 signed release
+
+- Developer ID Application identity installed for team 624KJV575U; notarization profile `Dunkerfy` validated without exposing credentials.
+- Release preparation passed formatting, 10 Rust tests, Clippy, native smoke checks, Sparkle startup, and signed-update tamper tests.
+- Apple accepted submission `c7ebfb3f-739b-40a4-a48c-83ef1d9ca6c5`. Stapling and ticket validation passed; Gatekeeper reports `Notarized Developer ID`.
+- Production appcast and ZIP signatures verified against the pinned Ed25519 key. Full interactive update installation/relaunch and live third-party notification capture remain unverified.

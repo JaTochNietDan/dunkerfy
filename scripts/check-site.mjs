@@ -14,7 +14,7 @@ for (const [, url] of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
     assert(fs.existsSync(destination), `Missing local asset ${url}`);
   } else assert(url.startsWith('https://'), `Unexpected URL ${url}`);
 }
-for (const required of ['<title>', 'name="description"', 'rel="canonical"', 'not yet verified', 'not Apple-notarized']) assert(html.includes(required), `Missing ${required}`);
+for (const required of ['<title>', 'name="description"', 'rel="canonical"', 'not yet verified', 'Developer ID signed and Apple-notarized']) assert(html.includes(required), `Missing ${required}`);
 assert.equal((html.match(/<h1\b/g) || []).length, 1);
 assert(!html.includes('rules.png'), 'Screenshots are intentionally deferred');
 const config = JSON.parse(fs.readFileSync(path.resolve(root, '../wrangler.jsonc'), 'utf8'));
