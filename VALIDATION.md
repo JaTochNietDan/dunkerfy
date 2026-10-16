@@ -66,3 +66,9 @@ Pending: Apple Developer portal sign-in and Developer ID Application certificate
 - Release preparation passed formatting, 10 Rust tests, Clippy, native smoke checks, Sparkle startup, and signed-update tamper tests.
 - Apple accepted submission `c7ebfb3f-739b-40a4-a48c-83ef1d9ca6c5`. Stapling and ticket validation passed; Gatekeeper reports `Notarized Developer ID`.
 - Production appcast and ZIP signatures verified against the pinned Ed25519 key. Full interactive update installation/relaunch and live third-party notification capture remain unverified.
+
+### 0.2.2 startup permissions
+
+- Added the native asynchronous Accessibility prompt on normal startup when trust is missing; opens the Settings page with setup guidance. Explicit Settings action can retry; the monitor only checks trust and never prompts.
+- Smoke coverage verifies missing → granted → revoked status labels without requesting permission or modifying macOS privacy settings. Smoke and preview modes return before the startup prompt.
+- Native Settings preview visually checked for readable instructions and status layout. Interactive system prompt/grant/revoke still needs hands-on verification.

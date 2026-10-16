@@ -235,6 +235,7 @@ struct App {
     status: String,
     trusted: bool,
     activity_view: Option<Obj>,
+    permission_status: Option<Obj>,
 }
 
 extern "C" fn action(_: *mut AnyObject, _: Sel, sender: *mut AnyObject) {
@@ -516,6 +517,7 @@ pub fn run() {
             status: "Starting…".into(),
             trusted: false,
             activity_view: None,
+            permission_status: None,
         };
         app.render();
         if let Some(path) = std::env::args().skip_while(|a| a != "--render-ui").nth(1) {
@@ -590,6 +592,19 @@ pub fn run() {
                 .editor
                 .as_ref()
                 .is_some_and(|e| e.original.sound == Sound::Bundled("wilhelm".into())));
+            app.page = 3;
+            app.trusted = false;
+            app.render();
+            assert!(get_text(app.permission_status.as_ref().unwrap()).starts_with("Access needed"));
+            app.trusted = true;
+            app.update_status();
+            assert_eq!(
+                get_text(app.permission_status.as_ref().unwrap()),
+                "✓ Access granted"
+            );
+            app.trusted = false;
+            app.update_status();
+            assert!(get_text(app.permission_status.as_ref().unwrap()).starts_with("Access needed"));
             app.page = 0;
             app.clear_page();
             app.draw_editor(Rule::default());
@@ -599,7 +614,15 @@ pub fn run() {
             let _: () = msg_send![&app._timer, invalidate];
             return;
         }
+        app.trusted = monitor::is_trusted();
+        if !app.trusted {
+            app.page = 3;
+            app.status = "Accessibility access needed".into();
+            app.render();
+            app.update_status();
+        }
         app.show();
+        monitor::request_access();
         STATE.with(|state| *state.borrow_mut() = Some(app));
         let _: () = msg_send![&application, run];
     });
@@ -644,6 +667,7 @@ impl App {
         self.now_playing = None;
         self.editor = None;
         self.activity_view = None;
+        self.permission_status = None;
         let subviews: Obj = msg_send![&self.content, subviews];
         let copy: Obj = msg_send![&subviews, copy];
         let count: usize = msg_send![&copy, count];
@@ -1292,7 +1316,7 @@ impl App {
             }
         }
     }
-    unsafe fn settings_page(&self) {
+    unsafe fn settings_page(&mut self) {
         self.header("Settings", "Set it up once. Let your apps do the talking.");
         panel(&self.content, rect(24., 377., 752., 165.));
         label(
@@ -1304,7 +1328,7 @@ impl App {
         );
         secondary(&label(
             &self.content,
-            "Allow Dunkerfy to read visible notification banners and match your sound rules.",
+            "Dunkerfy needs Accessibility access to read notification banners. Enable Dunkerfy in System Settings; listening starts automatically. Banner text stays on this Mac.",
             rect(43., 447., 690., 42.),
             12.,
             false,
@@ -1316,6 +1340,13 @@ impl App {
             70,
             rect(40., 394., 246., 32.),
         );
+        self.permission_status = Some(label(
+            &self.content,
+            self.permission_text(),
+            rect(310., 399., 440., 24.),
+            12.,
+            false,
+        ));
         panel(&self.content, rect(24., 199., 752., 165.));
         label(
             &self.content,
@@ -1686,9 +1717,12 @@ impl App {
                 self.activity.clear();
                 self.refresh_activity();
             }
-            70 => open_url(
-                "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
-            ),
+            70 => {
+                monitor::request_access();
+                open_url(
+                    "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+                );
+            }
             71 => open_url("x-apple.systempreferences:com.apple.Notifications-Settings.extension"),
             72 => {
                 let value: isize = msg_send![sender, state];
@@ -1802,7 +1836,17 @@ impl App {
         }
         Ok(())
     }
+    fn permission_text(&self) -> &'static str {
+        if self.trusted {
+            "✓ Access granted"
+        } else {
+            "Access needed · enable Dunkerfy to listen"
+        }
+    }
     unsafe fn update_status(&self) {
+        if let Some(label) = &self.permission_status {
+            set_text(label, self.permission_text());
+        }
         let prefix = if self.settings.paused { "Paused\n" } else { "" };
         set_text(&self.status_label, &format!("{prefix}{}", self.status));
     }

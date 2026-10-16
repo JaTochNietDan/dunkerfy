@@ -12,7 +12,9 @@ use std::{
 type Ref = *const c_void;
 #[link(name = "ApplicationServices", kind = "framework")]
 extern "C" {
-    fn AXIsProcessTrusted() -> bool;
+    fn AXIsProcessTrusted() -> u8;
+    fn AXIsProcessTrustedWithOptions(options: Ref) -> u8;
+    static kAXTrustedCheckOptionPrompt: Ref;
     fn AXUIElementCreateApplication(pid: i32) -> Ref;
     fn AXUIElementCopyAttributeValue(element: Ref, attribute: Ref, value: *mut Ref) -> i32;
     fn AXUIElementSetMessagingTimeout(element: Ref, timeout: f32) -> i32;
@@ -20,6 +22,15 @@ extern "C" {
 #[link(name = "CoreFoundation", kind = "framework")]
 extern "C" {
     fn CFRelease(object: Ref);
+    static kCFBooleanTrue: Ref;
+    fn CFDictionaryCreate(
+        allocator: Ref,
+        keys: *const Ref,
+        values: *const Ref,
+        count: isize,
+        key_callbacks: Ref,
+        value_callbacks: Ref,
+    ) -> Ref;
     fn CFRetain(object: Ref) -> Ref;
     fn CFEqual(a: Ref, b: Ref) -> bool;
     fn CFGetTypeID(value: Ref) -> usize;
@@ -38,6 +49,35 @@ extern "C" {
     fn CFArrayGetCount(array: Ref) -> isize;
     fn CFArrayGetValueAtIndex(array: Ref, index: isize) -> Ref;
 }
+/// Read permission without displaying a prompt (safe for the polling worker).
+pub fn is_trusted() -> bool {
+    unsafe { AXIsProcessTrusted() != 0 }
+}
+
+/// Ask macOS once per launch or explicit user action; never from the scan loop.
+/// The prompt is asynchronous. Only subsequent trust checks confirm a grant.
+pub fn request_access() {
+    if is_trusted() {
+        return;
+    }
+    unsafe {
+        // Both dictionary entries are process-lifetime CF constants, so no
+        // retain/release callbacks are needed for this short-lived dictionary.
+        let options = CFDictionaryCreate(
+            ptr::null(),
+            &kAXTrustedCheckOptionPrompt,
+            &kCFBooleanTrue,
+            1,
+            ptr::null(),
+            ptr::null(),
+        );
+        if !options.is_null() {
+            AXIsProcessTrustedWithOptions(options);
+            CFRelease(options);
+        }
+    }
+}
+
 const UTF8: u32 = 0x08000100;
 struct Owned(Ref);
 impl Drop for Owned {
@@ -129,7 +169,7 @@ impl Monitor {
         }
     }
     fn scan(&mut self) {
-        if !unsafe { AXIsProcessTrusted() } {
+        if !is_trusted() {
             self.previous.clear();
             self.primed = false;
             self.status("Accessibility access needed", false);

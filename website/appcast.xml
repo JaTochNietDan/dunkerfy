@@ -4,30 +4,31 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Dunkerfy</title>
         <item>
-            <title>0.2.1</title>
-            <pubDate>Thu, 15 Oct 2026 19:05:06 -0500</pubDate>
+            <title>0.2.2</title>
+            <pubDate>Thu, 15 Oct 2026 19:20:34 -0500</pubDate>
             <link>https://dunkerfy.oleary.club</link>
-            <sparkle:version>3</sparkle:version>
-            <sparkle:shortVersionString>0.2.1</sparkle:shortVersionString>
+            <sparkle:version>4</sparkle:version>
+            <sparkle:shortVersionString>0.2.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# Dunkerfy 0.2.1 — Developer preview
+            <description sparkle:format="markdown"><![CDATA[# Dunkerfy 0.2.2 — Startup permissions
 
-The compact native interface and 30-sound library from 0.2.0, now signed with Developer ID and notarized by Apple.
+Dunkerfy now requests macOS Accessibility access at startup when it is missing, instead of silently waiting for you to find the Settings page.
 
-- Compact 964 × 620 light/dark interface with tighter sidebar spacing.
-- Searchable sound library with the CC0 Wilhelm scream and 29 original effects.
-- Apple Developer ID signing, hardened runtime, and a stapled notarization ticket.
-- Signed Sparkle update feed and verified update downloads. Automatic checks and installation are opt-in.
+- Uses the native macOS permission prompt once per launch when access is missing. Already-authorized launches do not prompt.
+- Opens Dunkerfy’s Settings page with an explanation of why access is needed and how to enable it.
+- Shows live access status and resumes scanning when permission is granted. Revoking access stops scanning.
+- The Accessibility settings button can request access again. Background polling never prompts.
+- Automated smoke tests and UI previews do not request or change permissions.
 
-For Apple Silicon, macOS 13 or later. Quit Dunkerfy, extract the ZIP, and move Dunkerfy.app to Applications, replacing the previous version. Existing rules and imported sounds are preserved. Users of 0.1.0 must install manually; 0.2.0 includes Check for Updates.
+Developer ID signed and Apple-notarized. Apple Silicon, macOS 13 or later. Use Check for Updates, or quit Dunkerfy and replace the app in Applications with the extracted download. Rules and imported sounds are preserved.
 
-This remains a developer preview: live third-party notification capture and full update installation/relaunch testing are still pending. Notarization does not establish notification compatibility.
+This remains a developer preview. Live notification capture, interactive permission grant/revoke, and full update installation/relaunch still require hands-on validation.
 ]]></description>
-            <enclosure url="https://github.com/JaTochNietDan/dunkerfy/releases/download/v0.2.1/Dunkerfy-0.2.1-macOS-arm64.zip" length="3788255" type="application/octet-stream" sparkle:edSignature="h0KKTnenxKtSUvk0V8G2lUjECpVPLXuuF0PGUCodl6sNhITIoGxLbSJuZYVxqK/RbGkeM00XH9NPuHmU0W+jDw=="></enclosure>
+            <enclosure url="https://github.com/JaTochNietDan/dunkerfy/releases/download/v0.2.2/Dunkerfy-0.2.2-macOS-arm64.zip" length="3788957" type="application/octet-stream" sparkle:edSignature="yrTuG0oRJ9bJEC5XQHd/q136ksQu1x3BROysW844dRDe5nMe00cR7pupgkfLHuSAezDxL8ehdPdix+gFvlimBw=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: NBDVCFReFoEm5JOvB2q0StgDALrDvCIGGywwpV4gCnaq8GaLB4Ig7LtR3L00vgYW/zBGVSWxd+YE72GNowXfBA==
-length: 2228
+edSignature: 3mtEtKSatqEg1nHQYe7CoTcduB/rlMLeU27CwMVCSuU3jwTT3REKNi62RZmSsJ3wZdkMXp15euUYhTp0bvPpDQ==
+length: 2357
 -->

@@ -6,7 +6,7 @@
 <p align="center">A native macOS utility for custom notification sounds, written in Rust.<br>Give your inbox, team mentions, and finished builds sounds you recognize.</p>
 <p align="center">
   <a href="https://dunkerfy.oleary.club">Website</a> ·
-  <a href="https://github.com/JaTochNietDan/dunkerfy/releases/tag/v0.2.1">Download preview</a> ·
+  <a href="https://github.com/JaTochNietDan/dunkerfy/releases/tag/v0.2.2">Download preview</a> ·
   <a href="#setup">Setup</a> ·
   <a href="#build-from-source">Build</a> ·
   <a href="https://github.com/JaTochNietDan/dunkerfy/issues">Report an issue</a>
@@ -41,7 +41,7 @@ These are illustrative rules, not a list of verified app integrations. The sourc
 
 ## Download
 
-**[Download v0.2.1 for Apple Silicon](https://github.com/JaTochNietDan/dunkerfy/releases/download/v0.2.1/Dunkerfy-0.2.1-macOS-arm64.zip)** · macOS 13 or later
+**[Download v0.2.2 for Apple Silicon](https://github.com/JaTochNietDan/dunkerfy/releases/download/v0.2.2/Dunkerfy-0.2.2-macOS-arm64.zip)** · macOS 13 or later
 
 > **Developer preview:** this is an early release. The app is **Developer ID signed and Apple-notarized**. Rule logic, storage, native UI construction, and simulated sound playback have been tested. **Live third-party notification capture has not yet been verified.** See [validation results](VALIDATION.md) for the exact scope.
 
@@ -50,7 +50,7 @@ The downloadable build is for Apple Silicon. Intel builds and compatibility acro
 ## Setup
 
 1. Unzip the download and move **Dunkerfy.app** to `/Applications` before granting permissions.
-2. Open Dunkerfy’s **Settings** and follow **Open Accessibility Settings**. Enable Dunkerfy under **Privacy & Security → Accessibility**. Use the system panel’s **+** button if it is not listed.
+2. On startup, Dunkerfy requests Accessibility access if it is missing and opens its setup page. Follow the macOS prompt or use **Open Accessibility settings**. Enable Dunkerfy under **Privacy & Security → Accessibility**. Use the system panel’s **+** button if it is not listed.
 3. In macOS **Notifications**, keep banners or alerts enabled for each source app and disable its original notification sound. Some apps have a separate in-app sound setting. **Dunkerfy plays additional audio; it cannot cancel an app’s original sound.**
 4. Create a rule. Choose an application or enter the exact app name shown on its banner. Pick a sound, optionally enter a keyword, and save.
 5. Trigger a real notification and check **Activity**. Put specific rules above general ones.
@@ -129,7 +129,7 @@ Dunkerfy is an independent project inspired by the idea of per-app notification 
 
 ## In-app updates
 
-Sparkle is integrated directly from Rust, with an Updates page, Check for Updates menu item, opt-in automatic checks and installation, and signed feeds/downloads. Version 0.2.1 is Developer ID signed and notarized, with a signed production update feed. A full installation/relaunch test is still pending. Users of 0.1.0 must install manually; 0.2.0 includes Check for Updates.
+Sparkle is integrated directly from Rust, with an Updates page, Check for Updates menu item, opt-in automatic checks and installation, and signed feeds/downloads. Version 0.2.2 is Developer ID signed and notarized, with a signed production update feed. A full installation/relaunch test is still pending. Users of 0.1.0 must install manually; 0.2.0 includes Check for Updates.
 
 See [update and signing setup](docs/UPDATES.md) for the mise-managed release workflow.
 
